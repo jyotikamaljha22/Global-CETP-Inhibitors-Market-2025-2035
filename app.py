@@ -926,145 +926,19 @@ Final Strategic Outlook: Analysis indicates that the CETP category revival throu
 
 
 # =============================================================================
-# CLEANING, MASKING, TABLE RENDERING LOGIC
+# TABLE COLUMN COUNTS
 # =============================================================================
 TABLE_COLUMN_COUNTS = {
-    1: 5,
-    2: 5,
-    3: 5,
-    4: 5,
-    5: 6,
-    6: 5,
-    7: 5,
-    8: 5,
-    9: 5,
-    10: 5,
-    11: 5,
-    12: 5,
-    13: 6,
-    14: 5,
-    15: 5,
-    16: 6,
-    17: 5,
-    18: 4,
-    19: 4,
-    20: 4,
-    21: 5,
+    1: 5, 2: 5, 3: 5, 4: 5, 5: 6, 6: 5, 7: 5,
+    8: 5, 9: 5, 10: 5, 11: 5, 12: 5, 13: 6,
+    14: 5, 15: 5, 16: 6, 17: 5, 18: 4, 19: 4,
+    20: 4, 21: 5,
 }
 
 
-def remove_source_markers(text: str) -> str:
-    """
-    Remove draft-style source markers:
-    - sentence citations such as .1, .2, .18
-    - table-cell suffixes such as High 1
-    - standalone source registry lines
-    """
-    cleaned_lines = []
-
-    for raw_line in text.splitlines():
-        line = raw_line.rstrip()
-
-        if re.match(r"^\s*\d{1,2}:\s+", line):
-            continue
-
-        line = re.sub(r"(?<=[A-Za-z\)\]])\.(\d{1,2})(?=\s|$)", ".", line)
-        line = re.sub(r"(?<=%)\s+\d{1,2}$", "", line)
-
-        protected_short_labels = (
-            re.match(r"^\s*Phase\s+\d[a-zA-Z]?\s*$", line, flags=re.I)
-            or re.match(r"^\s*Wave\s+\d\s*$", line, flags=re.I)
-            or re.match(r"^\s*Year\s+\d\s*$", line, flags=re.I)
-            or re.match(r"^\s*TABLE\s+\d+", line, flags=re.I)
-            or re.match(r"^\s*\d{1,2}\.\d{1,2}", line)
-        )
-
-        if not protected_short_labels:
-            line = re.sub(r"(?<=[A-Za-z\)])\s+\d{1,2}$", "", line)
-
-        cleaned_lines.append(line)
-
-    return "\n".join(cleaned_lines)
-
-
-def mask_sensitive_numbers(text: str) -> str:
-    """
-    Mask market-sensitive values while preserving:
-    - years
-    - section headings
-    - table numbers
-    - Phase labels
-    - Wave labels
-    - 10mg dose labels
-    """
-    protected_tokens = {}
-
-    def protect(pattern: str):
-        nonlocal text
-
-        def repl(match):
-            token = f"__PROTECTED_{len(protected_tokens)}__"
-            protected_tokens[token] = match.group(0)
-            return token
-
-        text = re.sub(pattern, repl, text, flags=re.I | re.M)
-
-    protect(r"\b20\d{2}\s*[–-]\s*20\d{2}\b")
-    protect(r"(?m)^\s*\d{1,2}\.\d{1,2}\.?\s+")
-    protect(r"\bTABLE\s+\d{1,2}\b")
-    protect(r"\b20\d{2}\b")
-    protect(r"\bPhase\s+\d[a-zA-Z]?\b")
-    protect(r"\bWave\s+\d\b")
-    protect(r"\bYear\s+\d\b")
-    protect(r"\b\d+\s?mg\b")
-    protect(r"\b\d+(st|nd|rd|th)-line\b")
-
-    text = re.sub(
-        r"\bUS\s?\d[\d,\.]*\s?(Mn|million|billion|B|M)?",
-        "US$ [Proprietary]",
-        text,
-        flags=re.I,
-    )
-
-    text = re.sub(
-        r"US\$?\s?\d[\d,\.]*\s?(Mn|million|billion|B|M)?",
-        "US$ [Proprietary]",
-        text,
-        flags=re.I,
-    )
-
-    text = re.sub(
-        r"\$\s?\d[\d,\.]*\s?(Mn|million|billion|B|M)?",
-        "$ [Proprietary]",
-        text,
-        flags=re.I,
-    )
-
-    text = re.sub(r"\b\d[\d,\.]*\s?%", "[Proprietary]%", text)
-
-    text = re.sub(
-        r"\b\d[\d,\.]*\s?(million|billion|Mn|patients|patient|pts|CAGR)\b",
-        r"[Proprietary] \1",
-        text,
-        flags=re.I,
-    )
-
-    text = re.sub(r"\b\d{1,3}(?:,\d{3})+(?:\.\d+)?\b", "[Proprietary]", text)
-    text = re.sub(r"\b\d+\.\d+\b", "[Proprietary]", text)
-    text = re.sub(r"\b(?!(?:19|20)\d{2}\b)\d{4,}\b", "[Proprietary]", text)
-
-    for token, value in protected_tokens.items():
-        text = text.replace(token, value)
-
-    return text
-
-
-def clean_and_mask(text: str) -> str:
-    cleaned = remove_source_markers(text)
-    masked = mask_sensitive_numbers(cleaned)
-    return masked
-
-
+# =============================================================================
+# CLEANING AND MASKING
+# =============================================================================
 def parse_report_sections(text: str) -> dict:
     sections = {}
     current_header = "Cover / Report Title"
@@ -1082,136 +956,78 @@ def parse_report_sections(text: str) -> dict:
     return sections
 
 
-def render_table_html(table_title: str, table_lines: list[str]) -> str:
-    table_match = re.search(r"TABLE\s+(\d+)", table_title, flags=re.I)
-    if not table_match:
-        return f"<div class='report-table-title'>{html.escape(clean_and_mask(table_title))}</div>"
-
-    table_num = int(table_match.group(1))
-    col_count = TABLE_COLUMN_COUNTS.get(table_num)
-
-    cleaned_lines = [line for line in table_lines if line.strip()]
-
-    if not col_count or len(cleaned_lines) < col_count:
-        body = "<br>".join(html.escape(clean_and_mask(x)) for x in cleaned_lines)
-        return f"""
-        <div class="report-table-wrap">
-            <div class="report-table-title">{html.escape(clean_and_mask(table_title))}</div>
-            <div class="report-line" style="padding:14px 16px;">{body}</div>
-        </div>
-        """
-
-    headers = cleaned_lines[:col_count]
-    body_lines = cleaned_lines[col_count:]
-
-    if len(body_lines) % col_count != 0:
-        missing = col_count - (len(body_lines) % col_count)
-        body_lines = body_lines + [""] * missing
-
-    rows = [
-        body_lines[i: i + col_count]
-        for i in range(0, len(body_lines), col_count)
-    ]
-
-    header_html = "".join(
-        f"<th>{html.escape(clean_and_mask(cell))}</th>" for cell in headers
-    )
-
-    rows_html = ""
-    for row in rows:
-        rows_html += "<tr>"
-        for cell in row:
-            rows_html += f"<td>{html.escape(clean_and_mask(cell))}</td>"
-        rows_html += "</tr>"
-
-    return f"""
-    <div class="report-table-wrap">
-        <div class="report-table-title">{html.escape(clean_and_mask(table_title))}</div>
-        <table class="report-table">
-            <thead><tr>{header_html}</tr></thead>
-            <tbody>{rows_html}</tbody>
-        </table>
-    </div>
-    """
+REPORT_SECTIONS = parse_report_sections(REPORT_TEXT)
 
 
-def format_paragraph_line(line: str) -> str:
-    clean_line = clean_and_mask(line.strip())
+def remove_source_markers(text: str) -> str:
+    lines = []
 
-    if not clean_line:
-        return ""
+    for line in text.splitlines():
+        raw = line.rstrip()
 
-    if clean_line.startswith("## "):
-        clean_line = clean_line.replace("## ", "").strip()
-        return f"<div class='report-chapter-heading'>{html.escape(clean_line)}</div>"
+        if re.match(r"^\s*\d{1,2}:\s+", raw):
+            continue
 
-    if re.match(r"^\d{1,2}\.\d{1,2}\.?\s+", clean_line):
-        return f"<div class='report-subheading'>{html.escape(clean_line)}</div>"
+        raw = re.sub(r"(?<=[A-Za-z\)\]])\.(\d{1,2})(?=\s|$)", ".", raw)
+        raw = re.sub(r"(?<=%)\s+\d{1,2}$", "", raw)
 
-    if ":" in clean_line and len(clean_line.split(":")[0]) <= 55:
-        left, right = clean_line.split(":", 1)
-        return (
-            f"<p class='report-paragraph'><strong>{html.escape(left)}:</strong>"
-            f"{html.escape(right)}</p>"
+        is_short_protected = (
+            re.match(r"^\s*Phase\s+\d[a-zA-Z]?\s*$", raw, flags=re.I)
+            or re.match(r"^\s*Wave\s+\d\s*$", raw, flags=re.I)
+            or re.match(r"^\s*Year\s+\d\s*$", raw, flags=re.I)
+            or re.match(r"^\s*TABLE\s+\d+", raw, flags=re.I)
+            or re.match(r"^\s*\d{1,2}\.\d{1,2}", raw)
         )
 
-    return f"<p class='report-paragraph'>{html.escape(clean_line)}</p>"
+        if not is_short_protected:
+            raw = re.sub(r"(?<=[A-Za-z\)])\s+\d{1,2}$", "", raw)
+
+        lines.append(raw)
+
+    return "\n".join(lines)
 
 
-def render_report_html(raw_text: str) -> str:
-    lines = raw_text.strip().splitlines()
-    output = []
-    i = 0
+def mask_sensitive_numbers(text: str) -> str:
+    protected = {}
 
-    while i < len(lines):
-        line = lines[i].strip()
+    def protect(pattern):
+        nonlocal text
 
-        if re.match(r"^18\.2\.\s+Source Registry", line, flags=re.I):
-            i += 1
-            while i < len(lines) and not re.match(r"^18\.3\.", lines[i].strip()):
-                i += 1
-            continue
+        def repl(match):
+            token = f"__SAFE_{len(protected)}__"
+            protected[token] = match.group(0)
+            return token
 
-        if re.match(r"^TABLE\s+\d+:", line, flags=re.I):
-            table_title = line
-            i += 1
+        text = re.sub(pattern, repl, text, flags=re.I | re.M)
 
-            while i < len(lines) and not lines[i].strip():
-                i += 1
+    protect(r"\b20\d{2}\s*[–-]\s*20\d{2}\b")
+    protect(r"\b20\d{2}\s*[–-]\s*\d{2}\b")
+    protect(r"(?m)^\s*\d{1,2}\.\d{1,2}\.?\s+")
+    protect(r"\bTABLE\s+\d{1,2}\b")
+    protect(r"\b20\d{2}\b")
+    protect(r"\bPhase\s+\d[a-zA-Z]?\b")
+    protect(r"\bWave\s+\d\b")
+    protect(r"\bYear\s+\d\b")
+    protect(r"\b\d+\s?mg\b")
+    protect(r"\b\d+(st|nd|rd|th)-line\b")
 
-            table_lines = []
+    text = re.sub(r"\bUS\s?\d[\d,\.]*\s?(Mn|million|billion|B|M)?", "US$ [Proprietary]", text, flags=re.I)
+    text = re.sub(r"US\$?\s?\d[\d,\.]*\s?(Mn|million|billion|B|M)?", "US$ [Proprietary]", text, flags=re.I)
+    text = re.sub(r"\$\s?\d[\d,\.]*\s?(Mn|million|billion|B|M)?", "$ [Proprietary]", text, flags=re.I)
+    text = re.sub(r"\b\d[\d,\.]*\s?%", "[Proprietary]%", text)
+    text = re.sub(r"\b\d[\d,\.]*\s?(million|billion|Mn|patients|patient|pts|CAGR)\b", r"[Proprietary] \1", text, flags=re.I)
+    text = re.sub(r"\b\d{1,3}(?:,\d{3})+(?:\.\d+)?\b", "[Proprietary]", text)
+    text = re.sub(r"\b\d+\.\d+\b", "[Proprietary]", text)
+    text = re.sub(r"\b(?!(?:19|20)\d{2}\b)\d{4,}\b", "[Proprietary]", text)
 
-            while i < len(lines):
-                next_line = lines[i].strip()
+    for token, value in protected.items():
+        text = text.replace(token, value)
 
-                if not next_line:
-                    break
-
-                if next_line.startswith("## "):
-                    break
-
-                if re.match(r"^\d{1,2}\.\d{1,2}\.?\s+", next_line):
-                    break
-
-                if re.match(r"^TABLE\s+\d+:", next_line, flags=re.I):
-                    break
-
-                table_lines.append(next_line)
-                i += 1
-
-            output.append(render_table_html(table_title, table_lines))
-            continue
-
-        formatted = format_paragraph_line(line)
-        if formatted:
-            output.append(formatted)
-
-        i += 1
-
-    return "\n".join(output)
+    return text
 
 
-REPORT_SECTIONS = parse_report_sections(REPORT_TEXT)
+def clean_and_mask(text: str) -> str:
+    return mask_sensitive_numbers(remove_source_markers(text))
 
 
 # =============================================================================
@@ -1221,17 +1037,13 @@ def inject_css():
     st.markdown(
         f"""
         <style>
-        html, body, [class*="css"] {{
-            font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        }}
-
         .stApp {{
             background: {LIGHT_GREY};
             color: {DARK_TEXT};
         }}
 
         [data-testid="stHeader"] {{
-            background: rgba(244,245,247,0.72);
+            background: rgba(244,245,247,0.7);
         }}
 
         footer {{
@@ -1239,9 +1051,9 @@ def inject_css():
         }}
 
         .block-container {{
+            max-width: 1380px;
             padding-top: 1.2rem;
             padding-bottom: 1rem;
-            max-width: 1380px;
         }}
 
         section[data-testid="stSidebar"] {{
@@ -1257,7 +1069,6 @@ def inject_css():
             color: white;
             padding: 48px;
             border-radius: 28px;
-            border: 1px solid rgba(255,255,255,0.10);
             box-shadow: 0 20px 55px rgba(58,7,28,0.22);
             margin-bottom: 24px;
         }}
@@ -1359,19 +1170,80 @@ def inject_css():
             color: {MUTED_TEXT};
             font-size: 14px;
             line-height: 1.65;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
         }}
 
-        .text-panel {{
+        .report-wrapper {{
             background: #FBFBFC;
             border: 1px solid {BORDER_GREY};
             border-left: 5px solid {BURGUNDY};
             border-radius: 16px;
             padding: 18px 20px;
-            line-height: 1.68;
+            margin: 14px 0 22px 0;
+        }}
+
+        .report-subheading {{
+            color: {BURGUNDY};
+            font-size: 17px;
+            font-weight: 850;
+            margin: 20px 0 10px 0;
+        }}
+
+        .report-paragraph {{
             color: {DARK_TEXT};
             font-size: 14.5px;
-            margin: 14px 0;
+            line-height: 1.72;
+            margin: 0 0 12px 0;
+        }}
+
+        .report-table-wrap {{
+            background: {WHITE};
+            border: 1px solid {BORDER_GREY};
+            border-radius: 16px;
+            margin: 18px 0 24px 0;
+            overflow-x: auto;
+            box-shadow: 0 8px 24px rgba(43,43,43,0.045);
+        }}
+
+        .report-table-title {{
+            background: linear-gradient(135deg, {BURGUNDY} 0%, {MID_BURGUNDY} 100%);
+            color: {WHITE};
+            font-size: 14px;
+            font-weight: 850;
+            padding: 13px 16px;
+        }}
+
+        .report-table {{
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 760px;
+            font-size: 13px;
+        }}
+
+        .report-table th {{
+            background: {BURGUNDY_DARK};
+            color: {WHITE};
+            text-align: left;
+            padding: 12px 14px;
+            font-weight: 800;
+            border-right: 1px solid rgba(255,255,255,0.12);
+            vertical-align: top;
+        }}
+
+        .report-table td {{
+            padding: 12px 14px;
+            border-bottom: 1px solid {BORDER_GREY};
+            color: {DARK_TEXT};
+            vertical-align: top;
+            line-height: 1.45;
+        }}
+
+        .report-table tbody tr:nth-child(even) td {{
+            background: #F8F8FA;
+        }}
+
+        .report-table tbody tr:hover td {{
+            background: #FFF9EA;
         }}
 
         .chart-card {{
@@ -1423,6 +1295,19 @@ def inject_css():
             overflow: hidden;
         }}
 
+        .bubble {{
+            position: absolute;
+            width: 112px;
+            min-height: 38px;
+            padding: 7px 10px;
+            border-radius: 999px;
+            text-align: center;
+            font-size: 11px;
+            line-height: 1.25;
+            font-weight: 800;
+            box-shadow: 0 10px 24px rgba(91,14,45,0.16);
+        }}
+
         .axis-label-x {{
             position: absolute;
             bottom: 12px;
@@ -1442,20 +1327,6 @@ def inject_css():
             color: {MUTED_TEXT};
             font-size: 12px;
             font-weight: 700;
-        }}
-
-        .bubble {{
-            position: absolute;
-            width: 112px;
-            min-height: 38px;
-            padding: 7px 10px;
-            border-radius: 999px;
-            color: white;
-            text-align: center;
-            font-size: 11px;
-            line-height: 1.25;
-            font-weight: 800;
-            box-shadow: 0 10px 24px rgba(91,14,45,0.16);
         }}
 
         .heatmap {{
@@ -1510,87 +1381,6 @@ def inject_css():
             background: white;
         }}
 
-        .report-chapter-heading {{
-            color: {BURGUNDY_DARK};
-            font-size: 22px;
-            font-weight: 900;
-            margin: 26px 0 14px 0;
-            padding: 10px 0 8px 0;
-            border-bottom: 1px solid {BORDER_GREY};
-        }}
-
-        .report-subheading {{
-            color: {BURGUNDY};
-            font-size: 17px;
-            font-weight: 850;
-            margin: 22px 0 10px 0;
-            padding-top: 4px;
-        }}
-
-        .report-paragraph {{
-            color: {DARK_TEXT};
-            font-size: 14.5px;
-            line-height: 1.72;
-            margin: 0 0 12px 0;
-        }}
-
-        .report-table-wrap {{
-            background: {WHITE};
-            border: 1px solid {BORDER_GREY};
-            border-radius: 16px;
-            margin: 18px 0 24px 0;
-            overflow-x: auto;
-            box-shadow: 0 8px 24px rgba(43,43,43,0.045);
-        }}
-
-        .report-table-title {{
-            background: linear-gradient(135deg, {BURGUNDY} 0%, {MID_BURGUNDY} 100%);
-            color: {WHITE};
-            font-size: 14px;
-            font-weight: 850;
-            padding: 13px 16px;
-            letter-spacing: 0.01em;
-        }}
-
-        .report-table {{
-            width: 100%;
-            border-collapse: collapse;
-            min-width: 760px;
-            font-size: 13px;
-        }}
-
-        .report-table th {{
-            background: {BURGUNDY_DARK};
-            color: {WHITE};
-            text-align: left;
-            padding: 12px 14px;
-            font-weight: 800;
-            border-right: 1px solid rgba(255,255,255,0.12);
-            vertical-align: top;
-        }}
-
-        .report-table td {{
-            padding: 12px 14px;
-            border-bottom: 1px solid {BORDER_GREY};
-            color: {DARK_TEXT};
-            vertical-align: top;
-            line-height: 1.45;
-        }}
-
-        .report-table tbody tr:nth-child(even) td {{
-            background: #F8F8FA;
-        }}
-
-        .report-table tbody tr:hover td {{
-            background: #FFF9EA;
-        }}
-
-        .report-line {{
-            line-height: 1.7;
-            font-size: 14.5px;
-            color: {DARK_TEXT};
-        }}
-
         .closing-panel {{
             background: linear-gradient(135deg, {BURGUNDY_DARK} 0%, {BURGUNDY} 100%);
             color: white;
@@ -1638,12 +1428,6 @@ def inject_css():
             min-height: 42px !important;
         }}
 
-        .stButton > button:hover {{
-            border: 0 !important;
-            color: white !important;
-            transform: translateY(-1px);
-        }}
-
         @media (max-width: 900px) {{
             .kpi-grid {{
                 grid-template-columns: repeat(1, minmax(0, 1fr));
@@ -1669,6 +1453,165 @@ def inject_css():
             }}
         }}
         </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+# =============================================================================
+# RENDERING HELPERS
+# =============================================================================
+def render_paragraph_line(line: str):
+    cleaned = clean_and_mask(line.strip())
+
+    if not cleaned:
+        return
+
+    if re.match(r"^\d{1,2}\.\d{1,2}\.?\s+", cleaned):
+        st.markdown(
+            f"<div class='report-subheading'>{html.escape(cleaned)}</div>",
+            unsafe_allow_html=True,
+        )
+        return
+
+    if ":" in cleaned and len(cleaned.split(":")[0]) <= 55:
+        left, right = cleaned.split(":", 1)
+        st.markdown(
+            f"<p class='report-paragraph'><strong>{html.escape(left)}:</strong>{html.escape(right)}</p>",
+            unsafe_allow_html=True,
+        )
+        return
+
+    st.markdown(
+        f"<p class='report-paragraph'>{html.escape(cleaned)}</p>",
+        unsafe_allow_html=True,
+    )
+
+
+def render_table(table_title: str, table_lines: list[str]):
+    table_match = re.search(r"TABLE\s+(\d+)", table_title, flags=re.I)
+    if not table_match:
+        return
+
+    table_num = int(table_match.group(1))
+    col_count = TABLE_COLUMN_COUNTS.get(table_num, 5)
+
+    rows_source = [x.strip() for x in table_lines if x.strip()]
+
+    if len(rows_source) < col_count:
+        return
+
+    headers = rows_source[:col_count]
+    body = rows_source[col_count:]
+
+    if len(body) % col_count != 0:
+        body = body + [""] * (col_count - (len(body) % col_count))
+
+    header_html = "".join(
+        f"<th>{html.escape(clean_and_mask(h))}</th>" for h in headers
+    )
+
+    rows_html = ""
+    for i in range(0, len(body), col_count):
+        row = body[i:i + col_count]
+        rows_html += "<tr>"
+        for cell in row:
+            rows_html += f"<td>{html.escape(clean_and_mask(cell))}</td>"
+        rows_html += "</tr>"
+
+    table_html = f"""
+    <div class="report-table-wrap">
+        <div class="report-table-title">{html.escape(clean_and_mask(table_title))}</div>
+        <table class="report-table">
+            <thead><tr>{header_html}</tr></thead>
+            <tbody>{rows_html}</tbody>
+        </table>
+    </div>
+    """
+
+    st.markdown(table_html, unsafe_allow_html=True)
+
+
+def render_report_block(raw_text: str, max_lines=None, stop_before_table=False):
+    lines = raw_text.strip().splitlines()
+
+    if max_lines is not None:
+        lines = lines[:max_lines]
+
+    st.markdown("<div class='report-wrapper'>", unsafe_allow_html=True)
+
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+
+        if not line:
+            i += 1
+            continue
+
+        if re.match(r"^18\.2\.\s+Source Registry", line, flags=re.I):
+            i += 1
+            while i < len(lines) and not re.match(r"^18\.3\.", lines[i].strip()):
+                i += 1
+            continue
+
+        if re.match(r"^TABLE\s+\d+:", line, flags=re.I):
+            if stop_before_table:
+                break
+
+            table_title = line
+            i += 1
+
+            while i < len(lines) and not lines[i].strip():
+                i += 1
+
+            table_lines = []
+
+            while i < len(lines):
+                candidate = lines[i].strip()
+
+                if not candidate:
+                    break
+
+                if candidate.startswith("## "):
+                    break
+
+                if re.match(r"^\d{1,2}\.\d{1,2}\.?\s+", candidate):
+                    break
+
+                if re.match(r"^TABLE\s+\d+:", candidate, flags=re.I):
+                    break
+
+                table_lines.append(candidate)
+                i += 1
+
+            render_table(table_title, table_lines)
+            continue
+
+        render_paragraph_line(line)
+        i += 1
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def section_intro(title, subtitle=""):
+    st.markdown(
+        f"""
+        <div class="section-card">
+            <div class="section-title">{html.escape(title)}</div>
+            {f'<div class="section-subtitle">{html.escape(subtitle)}</div>' if subtitle else ''}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def footer():
+    st.markdown(
+        """
+        <div class="footer-smr">
+            © 2026 Strategic Market Research. Confidential sample report preview prepared for Menarini.
+            Full quantitative outputs available in the complete report.
+        </div>
         """,
         unsafe_allow_html=True,
     )
@@ -1709,51 +1652,7 @@ def login_screen():
 
 
 # =============================================================================
-# HELPERS
-# =============================================================================
-def footer():
-    st.markdown(
-        """
-        <div class="footer-smr">
-            © 2026 Strategic Market Research. Confidential sample report preview prepared for Menarini.
-            Full quantitative outputs available in the complete report.
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-def section_card(title, subtitle="", body_html=""):
-    st.markdown(
-        f"""
-        <div class="section-card">
-            <div class="section-title">{html.escape(title)}</div>
-            {f'<div class="section-subtitle">{html.escape(subtitle)}</div>' if subtitle else ''}
-            {body_html}
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-def report_excerpt(section_key, max_lines=None):
-    text = REPORT_SECTIONS.get(section_key, "")
-    lines = text.splitlines()
-
-    if max_lines:
-        lines = lines[:max_lines]
-
-    rendered = render_report_html("\n".join(lines))
-
-    return f"""
-    <div class='text-panel report-line'>
-        {rendered}
-    </div>
-    """
-
-
-# =============================================================================
-# PURE HTML / SVG CHARTS
+# VISUALS
 # =============================================================================
 def chart_tam_sam_som_funnel():
     st.markdown(
@@ -1761,7 +1660,7 @@ def chart_tam_sam_som_funnel():
         <div class="chart-card">
             <div class="chart-title">TAM / SAM / SOM Funnel</div>
             <div class="chart-caption">
-                The full report quantifies each market layer, but this preview masks proprietary values while preserving the strategic narrowing logic.
+                The full report quantifies each market layer. This preview masks proprietary values while preserving the narrowing logic.
             </div>
             <div class="funnel-row" style="width:100%;background:{BURGUNDY};">
                 <span>Lipid-Lowering Therapy Revenue Pool</span><span>US$ [Proprietary]</span>
@@ -1796,16 +1695,17 @@ def chart_competitive_matrix():
     bubble_html = ""
     for label, left, top, color in bubbles:
         text_color = DARK_TEXT if color in [GOLD, SOFT_ROSE] else WHITE
-        bubble_html += f"""
-        <div class="bubble" style="left:{left}%;top:{top}%;background:{color};color:{text_color};">{html.escape(label)}</div>
-        """
+        bubble_html += (
+            f"<div class='bubble' style='left:{left}%;top:{top}%;"
+            f"background:{color};color:{text_color};'>{html.escape(label)}</div>"
+        )
 
     st.markdown(
         f"""
         <div class="chart-card">
             <div class="chart-title">Competitive Intensity vs Differentiation Matrix</div>
             <div class="chart-caption">
-                Therapy classes are placed on qualitative axes. No numeric scores are disclosed in this sample preview.
+                Therapy classes are positioned qualitatively. No numeric scores are disclosed in this sample preview.
             </div>
             <div class="matrix">
                 {bubble_html}
@@ -1831,36 +1731,27 @@ def chart_heatmap():
         "Rest of World": ["Low", "Low", "Low", "Low", "Low", "Low"],
     }
 
-    cols = [
-        "Reimbursement",
-        "LDL-C Gap",
-        "Specialist Adoption",
-        "Pricing Potential",
-        "Menarini Fit",
-        "Competitive Pressure",
-    ]
+    cols = ["Reimbursement", "LDL-C Gap", "Specialist Adoption", "Pricing Potential", "Menarini Fit", "Competitive Pressure"]
 
-    html_grid = "<div class='heatmap'>"
-    html_grid += "<div class='heat-cell heat-head'>Region</div>"
-
+    grid = "<div class='heatmap'><div class='heat-cell heat-head'>Region</div>"
     for c in cols:
-        html_grid += f"<div class='heat-cell heat-head'>{html.escape(c)}</div>"
+        grid += f"<div class='heat-cell heat-head'>{html.escape(c)}</div>"
 
     for region, vals in rows.items():
-        html_grid += f"<div class='heat-cell heat-row'>{html.escape(region)}</div>"
+        grid += f"<div class='heat-cell heat-row'>{html.escape(region)}</div>"
         for v in vals:
-            html_grid += f"<div class='heat-cell {v.lower()}'>{v}</div>"
+            grid += f"<div class='heat-cell {v.lower()}'>{v}</div>"
 
-    html_grid += "</div>"
+    grid += "</div>"
 
     st.markdown(
         f"""
         <div class="chart-card">
             <div class="chart-title">Regional Launch Readiness Heatmap</div>
             <div class="chart-caption">
-                Qualitative readiness view across launch-relevant markets. Underlying scores and country-level revenue tables are available in the full report.
+                Qualitative readiness view across launch-relevant markets.
             </div>
-            {html_grid}
+            {grid}
         </div>
         """,
         unsafe_allow_html=True,
@@ -1871,9 +1762,9 @@ def chart_sankey():
     st.markdown(
         f"""
         <div class="chart-card">
-            <div class="chart-title">Commercialization Pathway Sankey</div>
+            <div class="chart-title">Commercialization Pathway Map</div>
             <div class="chart-caption">
-                Symbolic patient-to-revenue conversion flow. Flow width is illustrative only and does not reveal proprietary patient counts or market values.
+                Symbolic patient-to-revenue conversion flow. Widths are illustrative only.
             </div>
             <div class="svg-wrap">
             <svg width="980" height="430" viewBox="0 0 980 430" xmlns="http://www.w3.org/2000/svg">
@@ -1915,51 +1806,6 @@ def chart_sankey():
                 <rect x="640" y="352" width="230" height="62" rx="16" fill="{BURGUNDY}"/>
                 <text x="755" y="378" text-anchor="middle" fill="white" font-size="13" font-weight="800">Menarini commercial</text>
                 <text x="755" y="396" text-anchor="middle" fill="white" font-size="13" font-weight="800">opportunity</text>
-
-                <text x="490" y="388" fill="{MUTED_TEXT}" font-size="13" font-weight="700">All values masked: [Proprietary]</text>
-            </svg>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-def chart_radar():
-    st.markdown(
-        f"""
-        <div class="chart-card">
-            <div class="chart-title">Risk vs Control Radar</div>
-            <div class="chart-caption">
-                Relative risk exposure is shown directionally. Exact risk scores and sensitivity outputs are available in the full report.
-            </div>
-            <div class="svg-wrap">
-            <svg width="760" height="500" viewBox="0 0 760 500" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="380" cy="240" r="55" fill="none" stroke="{BORDER_GREY}" stroke-width="1"/>
-                <circle cx="380" cy="240" r="105" fill="none" stroke="{BORDER_GREY}" stroke-width="1"/>
-                <circle cx="380" cy="240" r="155" fill="none" stroke="{BORDER_GREY}" stroke-width="1"/>
-                <line x1="380" y1="85" x2="380" y2="395" stroke="{BORDER_GREY}"/>
-                <line x1="225" y1="240" x2="535" y2="240" stroke="{BORDER_GREY}"/>
-                <line x1="270" y1="130" x2="490" y2="350" stroke="{BORDER_GREY}"/>
-                <line x1="490" y1="130" x2="270" y2="350" stroke="{BORDER_GREY}"/>
-
-                <polygon points="380,105 480,160 510,255 430,342 330,340 260,245 300,150"
-                         fill="{BURGUNDY}" opacity="0.22" stroke="{BURGUNDY}" stroke-width="3"/>
-                <circle cx="380" cy="105" r="5" fill="{GOLD}"/>
-                <circle cx="480" cy="160" r="5" fill="{GOLD}"/>
-                <circle cx="510" cy="255" r="5" fill="{GOLD}"/>
-                <circle cx="430" cy="342" r="5" fill="{GOLD}"/>
-                <circle cx="330" cy="340" r="5" fill="{GOLD}"/>
-                <circle cx="260" cy="245" r="5" fill="{GOLD}"/>
-                <circle cx="300" cy="150" r="5" fill="{GOLD}"/>
-
-                <text x="380" y="65" text-anchor="middle" fill="{DARK_TEXT}" font-size="13" font-weight="800">Regulatory timing</text>
-                <text x="530" y="150" fill="{DARK_TEXT}" font-size="13" font-weight="800">Payer acceptance</text>
-                <text x="545" y="260" fill="{DARK_TEXT}" font-size="13" font-weight="800">Competitive displacement</text>
-                <text x="440" y="385" fill="{DARK_TEXT}" font-size="13" font-weight="800">Physician adoption</text>
-                <text x="210" y="385" fill="{DARK_TEXT}" font-size="13" font-weight="800">FDC differentiation</text>
-                <text x="95" y="250" fill="{DARK_TEXT}" font-size="13" font-weight="800">Pricing discipline</text>
-                <text x="135" y="150" fill="{DARK_TEXT}" font-size="13" font-weight="800">Evidence durability</text>
             </svg>
             </div>
         </div>
@@ -2083,112 +1929,40 @@ def chart_value_architecture():
     )
 
 
-# =============================================================================
-# DASHBOARD TABLES
-# =============================================================================
-def render_market_layer_table():
+def chart_radar():
     st.markdown(
         f"""
         <div class="chart-card">
-            <div class="chart-title">Market Layer Architecture & Definitions</div>
-            <div class="chart-caption">Numerical values are masked; the structural logic remains visible in the preview.</div>
-            <div class="report-table-wrap">
-                <table class="report-table">
-                    <thead>
-                        <tr>
-                            <th>Market Layer</th>
-                            <th>Definition</th>
-                            <th>Starts From</th>
-                            <th>Use in Forecast</th>
-                            <th>Relevance to Menarini</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td><strong>Strict CETP Market</strong></td>
-                            <td>Revenue from approved CETP inhibitors only</td>
-                            <td>2027 launch</td>
-                            <td>Core growth metric</td>
-                            <td>Client product sales</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Practical TAM</strong></td>
-                            <td>Current revenue of relevant lipid-lowering therapies</td>
-                            <td>2025</td>
-                            <td>Ceiling / budget-pool logic</td>
-                            <td>Competitive revenue pool</td>
-                        </tr>
-                        <tr>
-                            <td><strong>SAM</strong></td>
-                            <td>CETP-addressable subset after label and access filters</td>
-                            <td>2027</td>
-                            <td>Eligible pool</td>
-                            <td>Territory volume potential</td>
-                        </tr>
-                        <tr>
-                            <td><strong>SOM</strong></td>
-                            <td>Obicetrapib revenue in Menarini territory</td>
-                            <td>2027</td>
-                            <td>Financial forecast</td>
-                            <td>Direct client revenue and profit</td>
-                        </tr>
-                    </tbody>
-                </table>
+            <div class="chart-title">Risk vs Control Radar</div>
+            <div class="chart-caption">
+                Relative risk exposure is shown directionally. Exact risk scores and sensitivity outputs are available in the full report.
             </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-def render_risk_table():
-    st.markdown(
-        f"""
-        <div class="chart-card">
-            <div class="chart-title">Risk / Barrier Matrix</div>
-            <div class="chart-caption">Market impact values are masked and shown directionally.</div>
-            <div class="report-table-wrap">
-                <table class="report-table">
-                    <thead>
-                        <tr>
-                            <th>Risk</th>
-                            <th>Severity</th>
-                            <th>Probability</th>
-                            <th>Market Impact</th>
-                            <th>Mitigation Priority</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td><strong>Narrow Label</strong></td>
-                            <td>High</td>
-                            <td>Medium</td>
-                            <td>[Proprietary] reduction in SAM</td>
-                            <td>HTA dossier preparation</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Class Skepticism</strong></td>
-                            <td>High</td>
-                            <td>Medium</td>
-                            <td>Slower adoption ramp</td>
-                            <td>Medical education</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Injectable Substitution</strong></td>
-                            <td>Medium</td>
-                            <td>High</td>
-                            <td>Caps high-risk share</td>
-                            <td>Oral biologic positioning</td>
-                        </tr>
-                        <tr>
-                            <td><strong>FDC Delay</strong></td>
-                            <td>Medium</td>
-                            <td>Low</td>
-                            <td>Blended price pressure</td>
-                            <td>MAA strategy</td>
-                        </tr>
-                    </tbody>
-                </table>
+            <div class="svg-wrap">
+            <svg width="760" height="500" viewBox="0 0 760 500" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="380" cy="240" r="55" fill="none" stroke="{BORDER_GREY}" stroke-width="1"/>
+                <circle cx="380" cy="240" r="105" fill="none" stroke="{BORDER_GREY}" stroke-width="1"/>
+                <circle cx="380" cy="240" r="155" fill="none" stroke="{BORDER_GREY}" stroke-width="1"/>
+                <line x1="380" y1="85" x2="380" y2="395" stroke="{BORDER_GREY}"/>
+                <line x1="225" y1="240" x2="535" y2="240" stroke="{BORDER_GREY}"/>
+                <line x1="270" y1="130" x2="490" y2="350" stroke="{BORDER_GREY}"/>
+                <line x1="490" y1="130" x2="270" y2="350" stroke="{BORDER_GREY}"/>
+                <polygon points="380,105 480,160 510,255 430,342 330,340 260,245 300,150"
+                         fill="{BURGUNDY}" opacity="0.22" stroke="{BURGUNDY}" stroke-width="3"/>
+                <circle cx="380" cy="105" r="5" fill="{GOLD}"/>
+                <circle cx="480" cy="160" r="5" fill="{GOLD}"/>
+                <circle cx="510" cy="255" r="5" fill="{GOLD}"/>
+                <circle cx="430" cy="342" r="5" fill="{GOLD}"/>
+                <circle cx="330" cy="340" r="5" fill="{GOLD}"/>
+                <circle cx="260" cy="245" r="5" fill="{GOLD}"/>
+                <circle cx="300" cy="150" r="5" fill="{GOLD}"/>
+                <text x="380" y="65" text-anchor="middle" fill="{DARK_TEXT}" font-size="13" font-weight="800">Regulatory timing</text>
+                <text x="530" y="150" fill="{DARK_TEXT}" font-size="13" font-weight="800">Payer acceptance</text>
+                <text x="545" y="260" fill="{DARK_TEXT}" font-size="13" font-weight="800">Competitive displacement</text>
+                <text x="440" y="385" fill="{DARK_TEXT}" font-size="13" font-weight="800">Physician adoption</text>
+                <text x="210" y="385" fill="{DARK_TEXT}" font-size="13" font-weight="800">FDC differentiation</text>
+                <text x="95" y="250" fill="{DARK_TEXT}" font-size="13" font-weight="800">Pricing discipline</text>
+                <text x="135" y="150" fill="{DARK_TEXT}" font-size="13" font-weight="800">Evidence durability</text>
+            </svg>
             </div>
         </div>
         """,
@@ -2230,109 +2004,107 @@ def render_cover():
         unsafe_allow_html=True,
     )
 
-    section_card(
+    section_intro(
         "Executive Thesis",
         "CETP inhibitors are being repositioned from a historically challenged mechanism into a potential next-generation oral lipid-lowering category.",
-        report_excerpt("1. Executive Overview & Strategic Snapshot ($Mn, %, 2025–2035)", 18),
     )
+    render_report_block(REPORT_SECTIONS["1. Executive Overview & Strategic Snapshot ($Mn, %, 2025–2035)"], stop_before_table=True)
 
     chart_tam_sam_som_funnel()
     chart_competitive_matrix()
 
 
 def render_market_architecture():
-    section_card(
+    section_intro(
         "Market Architecture",
         "The report separates the practical lipid-lowering therapy budget pool from the SAM and SOM available to CETP inhibitors after regulatory approval and payer access.",
-        report_excerpt("2. Market Definition, Scope & TAM/SAM/SOM Architecture"),
     )
-    render_market_layer_table()
+    render_report_block(REPORT_SECTIONS["2. Market Definition, Scope & TAM/SAM/SOM Architecture"])
     chart_tam_sam_som_funnel()
 
 
 def render_opportunity_logic():
-    section_card(
+    section_intro(
         "CETP Inhibitor Opportunity Logic",
         "Obicetrapib reframes the CETP class by addressing historical potency and safety concerns while targeting the uncontrolled LDL-C gap.",
-        report_excerpt("3. CETP Mechanism, Class History & Repositioning Logic"),
     )
+    render_report_block(REPORT_SECTIONS["3. CETP Mechanism, Class History & Repositioning Logic"])
     chart_sankey()
     chart_transition_map()
 
 
 def render_menarini_fit():
-    section_card(
+    section_intro(
         "Menarini / Obicetrapib Strategic Fit",
         "Menarini’s commercial opportunity is tied to successful HTA navigation, evidence-led physician education and territory-specific launch sequencing.",
-        report_excerpt("14. Menarini Opportunity, Value Capture & Strategic Positioning"),
     )
+    render_report_block(REPORT_SECTIONS["14. Menarini Opportunity, Value Capture & Strategic Positioning"])
     chart_value_architecture()
 
 
 def render_tam_preview():
-    section_card(
+    section_intro(
         "TAM / SAM / SOM Preview",
         "The full report provides year-by-year quantitative tables, but this sample preview masks all values to preserve proprietary model outputs.",
-        report_excerpt("10. Market Size & Forecast, 2025–2035 ($Mn, Patients, %)", 70),
     )
+    render_report_block(REPORT_SECTIONS["10. Market Size & Forecast, 2025–2035 ($Mn, Patients, %)"])
     chart_tam_sam_som_funnel()
     chart_sankey()
 
 
 def render_competitive():
-    section_card(
+    section_intro(
         "Competitive Landscape",
         "Direct CETP competition is limited, but substitute pressure from statins, ezetimibe, bempedoic acid, PCSK9 mAbs and inclisiran shapes adoption ceilings.",
-        report_excerpt("12. Competitive Landscape & Substitute Therapy Pressure"),
     )
+    render_report_block(REPORT_SECTIONS["12. Competitive Landscape & Substitute Therapy Pressure"])
     chart_competitive_matrix()
     chart_transition_map()
 
 
 def render_regulatory():
-    section_card(
+    section_intro(
         "Clinical & Regulatory Readiness",
         "Approval timing, label breadth and outcomes evidence are critical variables in the forecast.",
-        report_excerpt("7. Obicetrapib Clinical Evidence & Pipeline Positioning")
-        + report_excerpt("8. Regulatory Pathway, Label Scenarios & Launch Timing"),
     )
+    render_report_block(REPORT_SECTIONS["7. Obicetrapib Clinical Evidence & Pipeline Positioning"])
+    render_report_block(REPORT_SECTIONS["8. Regulatory Pathway, Label Scenarios & Launch Timing"])
 
 
 def render_pricing_access():
-    section_card(
+    section_intro(
         "Pricing, Access & Adoption",
         "Pricing strategy must navigate between low-cost generic add-ons and high-cost injectables while building a payer case for an oral biologic-like step.",
-        report_excerpt("9. Pricing, Reimbursement & Monetization Architecture ($/Patient/Year)")
-        + report_excerpt("13. Adoption Dynamics, Access Readiness & Market Conversion"),
     )
+    render_report_block(REPORT_SECTIONS["9. Pricing, Reimbursement & Monetization Architecture ($/Patient/Year)"])
+    render_report_block(REPORT_SECTIONS["13. Adoption Dynamics, Access Readiness & Market Conversion"])
 
 
 def render_region():
-    section_card(
+    section_intro(
         "Regional Launch Prioritization",
         "Germany and the UK anchor Wave 1 commercialization, while France, Switzerland, Italy and Spain shape mid-term expansion.",
-        report_excerpt("11. Europe, UK & Switzerland Opportunity Analysis"),
     )
+    render_report_block(REPORT_SECTIONS["11. Europe, UK & Switzerland Opportunity Analysis"])
     chart_heatmap()
 
 
 def render_risk():
-    section_card(
+    section_intro(
         "Risk, Barriers & Watchpoints",
         "The most important downside risks relate to restrictive labeling, payer filters, CETP class skepticism and FDC timing.",
-        report_excerpt("15. Scenario Analysis & Forecast Sensitivities")
-        + report_excerpt("16. Risk Assessment & Mitigation Framework"),
     )
-    render_risk_table()
+    render_report_block(REPORT_SECTIONS["15. Scenario Analysis & Forecast Sensitivities"])
+    render_report_block(REPORT_SECTIONS["16. Risk Assessment & Mitigation Framework"])
     chart_radar()
 
 
 def render_strategy():
-    section_card(
+    section_intro(
         "Strategic Roadmap & Recommendations",
         "The commercial roadmap moves from approval preparation and Wave 1 launch to Wave 2 scaling and outcomes-supported broader adoption.",
-        report_excerpt("17. Strategic Roadmap & Future Outlook, 2025–2035"),
     )
+    render_report_block(REPORT_SECTIONS["17. Strategic Roadmap & Future Outlook, 2025–2035"])
     chart_value_architecture()
 
 
@@ -2361,17 +2133,9 @@ def render_closing():
 
 
 def render_full_report():
-    st.markdown(
-        """
-        <div class="section-card">
-            <div class="section-title">Full Report Summary Explorer</div>
-            <div class="section-subtitle">
-                Every section from the embedded report summary is shown below with market-sensitive values masked.
-                Tables are rendered as structured client-facing exhibits. Source-marker artifacts have been removed for presentation quality.
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
+    section_intro(
+        "Full Report Summary Explorer",
+        "Every section from the embedded report summary is shown below with market-sensitive values masked and tables rendered as structured exhibits.",
     )
 
     query = st.text_input(
@@ -2382,26 +2146,29 @@ def render_full_report():
     show_all = st.toggle("Show complete summary in one continuous view", value=False)
 
     if show_all:
-        st.markdown(
-            f"<div class='text-panel report-line'>{render_report_html(REPORT_TEXT)}</div>",
-            unsafe_allow_html=True,
-        )
+        for title, content in REPORT_SECTIONS.items():
+            if title == "Cover / Report Title":
+                continue
+            st.markdown(
+                f"<div class='section-title' style='margin-top:28px;'>{html.escape(title)}</div>",
+                unsafe_allow_html=True,
+            )
+            render_report_block(content)
     else:
         for title, content in REPORT_SECTIONS.items():
-            combined = f"{title}\n{content}"
+            if title == "Cover / Report Title":
+                continue
 
+            combined = f"{title}\n{content}"
             if query.strip() and query.lower() not in combined.lower():
                 continue
 
             with st.expander(title, expanded=False):
-                st.markdown(
-                    f"<div class='report-line'>{render_report_html(content)}</div>",
-                    unsafe_allow_html=True,
-                )
+                render_report_block(content)
 
 
 # =============================================================================
-# MAIN APP
+# MAIN
 # =============================================================================
 def main():
     inject_css()
