@@ -1,386 +1,854 @@
+import re
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-import plotly.express as px
 
-# =============================================================================
-# 1. PAGE CONFIGURATION & THEME
-# =============================================================================
+
+# =========================================================
+# PAGE CONFIG
+# =========================================================
 st.set_page_config(
-    page_title="Global CETP Inhibitors Market Dashboard | Menarini",
-    page_icon="🩺",
+    page_title="SMR | CETP Inhibitors Market Preview",
+    page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# Custom CSS to inject the Burgundy & Gold theme from the HTML sample
-st.markdown("""
-    <style>
-    /* Main Background and Text */
-    .stApp { background-color: #F3F4F6; }
-    h1, h2, h3 { color: #800020 !important; font-family: 'Inter', sans-serif; }
-    
-    /* Sidebar styling */
-    [data-testid="stSidebar"] {
-        background-color: #800020;
-        color: white;
-    }
-    [data-testid="stSidebar"] * { color: white !important; }
-    
-    /* Navigation Link active state simulation */
-    .nav-label {
-        font-weight: bold;
-        text-transform: uppercase;
-        font-size: 0.75rem;
-        letter-spacing: 0.1em;
-        margin-top: 1rem;
-        color: #D4AF37 !important;
+
+# =========================================================
+# ACCESS CREDENTIALS
+# =========================================================
+USERNAME = "SMR"
+PASSWORD = "SMR@2026"
+
+
+# =========================================================
+# THEME CONSTANTS
+# =========================================================
+DEEP_BURGUNDY = "#5B0E2D"
+DARK_WINE = "#3A071C"
+MID_BURGUNDY = "#8D1645"
+SOFT_ROSE = "#D8A7B1"
+GOLD = "#C9A227"
+LIGHT_GREY = "#F4F5F7"
+WHITE = "#FFFFFF"
+DARK_TEXT = "#2B2B2B"
+MUTED_TEXT = "#666666"
+BORDER_GREY = "#E1E4E8"
+
+
+# =========================================================
+# MASKING FUNCTION
+# =========================================================
+def mask_sensitive_numbers(text: str) -> str:
+    """
+    Masks market-sensitive numeric values while preserving important year references
+    such as 2025, 2030, 2035, Phase 2, Phase 3, and 10mg.
+    """
+
+    if not text:
+        return text
+
+    protected_tokens = {
+        "2025": "__YEAR_2025__",
+        "2026": "__YEAR_2026__",
+        "2027": "__YEAR_2027__",
+        "2028": "__YEAR_2028__",
+        "2029": "__YEAR_2029__",
+        "2030": "__YEAR_2030__",
+        "2031": "__YEAR_2031__",
+        "2032": "__YEAR_2032__",
+        "2033": "__YEAR_2033__",
+        "2034": "__YEAR_2034__",
+        "2035": "__YEAR_2035__",
+        "Phase 2": "__PHASE_2__",
+        "Phase 3": "__PHASE_3__",
+        "10mg": "__TEN_MG__",
+        "10 mg": "__TEN_MG_SPACE__",
     }
 
-    /* KPI Cards */
-    .kpi-card {
-        background-color: white;
-        padding: 20px;
-        border-radius: 12px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        border-top: 4px solid #800020;
-        text-align: center;
-    }
-    .kpi-card-gold { border-top: 4px solid #D4AF37; }
-    .kpi-title { font-size: 0.75rem; font-weight: bold; color: #6B7280; text-transform: uppercase; margin-bottom: 5px; }
-    .kpi-value { font-size: 1.5rem; font-weight: bold; color: #1F2937; }
+    for original, token in protected_tokens.items():
+        text = text.replace(original, token)
 
-    /* Tables */
-    .styled-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin: 25px 0;
-        font-size: 0.9em;
-        border-radius: 8px 8px 0 0;
-        overflow: hidden;
-        box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
-    }
-    .styled-table thead tr {
-        background-color: #800020;
-        color: #ffffff;
-        text-align: left;
-    }
-    .styled-table th, .styled-table td { padding: 12px 15px; }
-    .styled-table tbody tr { border-bottom: 1px solid #dddddd; background-color: white; }
-    .styled-table tbody tr:nth-of-type(even) { background-color: #f3f3f3; }
+    # Currency / revenue / market values
+    text = re.sub(r"(US\$|USD|\$)\s?\d[\d,]*(?:\.\d+)?\s?(billion|million|Mn|M|B|bn|m)?", "US$ [Proprietary]", text, flags=re.I)
+    text = re.sub(r"\d[\d,]*(?:\.\d+)?\s?(billion|million|Mn|M|B|bn)\b", "[Proprietary]", text, flags=re.I)
 
-    /* Redacted Tag */
-    .redacted {
-        color: #9CA3AF;
-        font-size: 0.85em;
-        font-family: monospace;
-        font-weight: bold;
-        background: #e5e7eb;
-        padding: 2px 4px;
-        border-radius: 4px;
-    }
-    </style>
-""", unsafe_allow_html=True)
+    # Percentages and CAGRs
+    text = re.sub(r"\d+(?:\.\d+)?\s?%", "[Proprietary]%", text)
+    text = re.sub(r"\bCAGR\s+of\s+\[Proprietary\]%", "CAGR of [Proprietary]%", text, flags=re.I)
 
-# =============================================================================
-# 2. SECURITY / LOGIN METHOD
-# =============================================================================
-def check_password():
-    """Returns `True` if the user had the correct password."""
-    def password_entered():
-        """Checks whether a password entered by the user is correct."""
-        if st.session_state["username"] == "SMR" and st.session_state["password"] == "SMR@2026":
-            st.session_state["password_correct"] = True
-            del st.session_state["password"]  # don't store password
-            del st.session_state["username"]
+    # Patient counts / pools
+    text = re.sub(r"\d+(?:\.\d+)?\s?(patients|patient pool|pts|individuals)", "[Proprietary] patients", text, flags=re.I)
+
+    # Ratios / prevalence formats
+    text = re.sub(r"\b1\s+in\s+\d+\b", "[Proprietary] prevalence", text, flags=re.I)
+
+    # Broad standalone decimals likely to be market data
+    text = re.sub(r"\b\d{1,3},\d{3}(?:\.\d+)?\b", "[Proprietary]", text)
+    text = re.sub(r"\b\d+\.\d+\b", "[Proprietary]", text)
+
+    for original, token in protected_tokens.items():
+        text = text.replace(token, original)
+
+    return text
+
+
+# =========================================================
+# EMBEDDED REPORT CONTENT — SECTION 1 ONLY FOR THIS BUILD
+# All sensitive values are already masked for GitHub safety.
+# =========================================================
+REPORT_SECTIONS = {
+    "Cover & Executive Snapshot": """
+## 1. Executive Overview & Strategic Snapshot ($Mn, %, 2025–2035)
+
+### 1.1. Strategic Market Thesis
+
+The global landscape for lipid-lowering therapies (LLT) is currently undergoing a structural transformation, characterized by the emergence of high-efficacy oral alternatives to established injectable biologics. The cholesteryl ester transfer protein (CETP) inhibitor class, once sidelined due to the historical clinical failures of earlier-generation assets, is being revived through the development of obicetrapib. Analysis indicates that the current market represents a unique category-creation opportunity rather than a mature, multi-product space.
+
+As of 2025, the strict CETP inhibitor market generates zero commercial revenue, reflecting its pre-approval status. However, the commercial potential is anchored in a massive, established lipid-lowering treatment landscape where a significant proportion of high-risk patients fail to achieve low-density lipoprotein cholesterol (LDL-C) goals.
+
+Obicetrapib is positioned as the first next-generation CETP inhibitor to successfully decouple potent LDL-C lowering from the off-target safety issues and efficacy neutralities that plagued predecessors such as torcetrapib and evacetrapib. This asset serves as the primary vehicle for class revival, targeting the LDL-C gap in patients who remain uncontrolled despite maximally tolerated statin therapy.
+
+The strategic thesis for Menarini focuses on the commercialization of obicetrapib monotherapy and its fixed-dose combination (FDC) with ezetimibe across Europe, the UK, and Switzerland. Success is predicated on overcoming historical class skepticism through a robust evidence base, including the pivotal Phase 3 BROADWAY, BROOKLYN, and TANDEM trials, alongside the ongoing PREVAIL cardiovascular outcomes trial.
+
+### 1.2. Market Size Snapshot
+
+The market sizing architecture differentiates between the currently monetized lipid-lowering landscape, defined as the Practical Total Addressable Market (TAM), and the specific opportunity for CETP inhibitors post-approval, defined as the Serviceable Addressable Market (SAM) and Menarini’s Serviceable Obtainable Market (SOM).
+
+The global practical TAM is reset to US$ [Proprietary] in 2025, reflecting the total revenue generated by existing therapies including statins, ezetimibe, bempedoic acid, PCSK9 monoclonal antibodies, and inclisiran.
+
+Analysis indicates that while the global TAM grows at a steady [Proprietary]% CAGR, the Menarini-specific opportunity experiences a rapid ramp-up following expected reimbursement activation, reaching US$ [Proprietary] by 2035. The practical TAM reflects the existing budget pool for lipid management, while the SAM narrows this to the specific uncontrolled and high-risk patients that obicetrapib will target.
+
+### 1.3. Executive Growth Indicators
+
+The trajectory of the CETP inhibitor market is defined by a strategic shift from monotherapy volume to high-value combination treatment. The forecast indicates that while obicetrapib monotherapy will drive early volume in the initial launch period, the obicetrapib / ezetimibe FDC will become the primary revenue driver by the mid-2030s.
+
+Product Split Evolution: By 2035, the FDC is expected to account for [Proprietary]% of total Menarini SOM revenue, reflecting the clinical trend toward earlier intensification and the convenience of single-pill combinations.
+
+Geographic Concentration: Menarini’s opportunity is concentrated in Germany and the United Kingdom, which represent two of the highest-priority commercial markets in the launch territory.
+
+Launch Velocity and Ramp: Revenue generation is strictly launch-flagged, with no commercial revenue projected before 2027. The first full five years of launch are critical for establishing specialist trust and securing inclusion in clinical guidelines.
+
+Sensitivity to Outcomes Data: Analysis indicates that positive results from the PREVAIL cardiovascular outcomes trial serve as a major upside lever, potentially increasing adoption multipliers above base-case projections in the post-2030 window.
+
+### 1.4. Strategic Implications for Menarini
+
+Menarini’s role in this category-creation effort is focused on the successful navigation of European Health Technology Assessment and payer landscapes. The opportunity is concentrated in high-risk patient groups, specifically those with Heterozygous Familial Hypercholesterolemia and established Atherosclerotic Cardiovascular Disease who fail to reach LDL-C targets on standard oral therapies.
+
+Commercial adoption is expected to depend on the ability to position obicetrapib as a biologic-like oral alternative. Menarini must win in the uncontrolled high-risk pool, which represents the primary demand engine for early adoption. Priority markets include Germany, the UK, and France, where infrastructure for lipid management is most advanced and the addressable patient pool is largest.
+
+Strategic efforts must be directed toward medical education that addresses the historical CETP failures by emphasizing obicetrapib’s high selectivity and lack of blood pressure side effects. Furthermore, positioning the FDC as a superior oral alternative to bempedoic acid / ezetimibe combinations will be essential for maximizing blended net price per patient.
+"""
+}
+
+
+EXECUTIVE_MARKET_TABLE = [
+    {
+        "Market Layer": "Global Practical TAM",
+        "2025 Value": "US$ [Proprietary]",
+        "2030 Value": "US$ [Proprietary]",
+        "2035 Value": "US$ [Proprietary]",
+        "2025–35 CAGR": "[Proprietary]%",
+    },
+    {
+        "Market Layer": "Menarini Territory TAM",
+        "2025 Value": "US$ [Proprietary]",
+        "2030 Value": "US$ [Proprietary]",
+        "2035 Value": "US$ [Proprietary]",
+        "2025–35 CAGR": "[Proprietary]%",
+    },
+    {
+        "Market Layer": "CETP-Addressable SAM",
+        "2025 Value": "US$ [Proprietary]",
+        "2030 Value": "US$ [Proprietary]",
+        "2035 Value": "US$ [Proprietary]",
+        "2025–35 CAGR": "Activated from launch",
+    },
+    {
+        "Market Layer": "Menarini-Capturable SOM",
+        "2025 Value": "US$ [Proprietary]",
+        "2030 Value": "US$ [Proprietary]",
+        "2035 Value": "US$ [Proprietary]",
+        "2025–35 CAGR": "Launch-driven",
+    },
+    {
+        "Market Layer": "Strict CETP Inhibitor Revenue",
+        "2025 Value": "US$ [Proprietary]",
+        "2030 Value": "US$ [Proprietary]",
+        "2035 Value": "US$ [Proprietary]",
+        "2025–35 CAGR": "Launch-driven",
+    },
+]
+
+
+# =========================================================
+# CSS
+# =========================================================
+def inject_css():
+    st.markdown(
+        f"""
+        <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+        html, body, [class*="css"] {{
+            font-family: 'Inter', sans-serif !important;
+            background: {LIGHT_GREY};
+            color: {DARK_TEXT};
+        }}
+
+        /* Hide Streamlit clutter */
+        #MainMenu {{visibility: hidden;}}
+        footer {{visibility: hidden;}}
+        header {{visibility: hidden;}}
+        [data-testid="stToolbar"] {{display: none !important;}}
+        [data-testid="stDecoration"] {{display: none !important;}}
+        [data-testid="stStatusWidget"] {{display: none !important;}}
+
+        .block-container {{
+            padding-top: 1.5rem !important;
+            padding-bottom: 3rem !important;
+            max-width: 1420px !important;
+        }}
+
+        section[data-testid="stSidebar"] {{
+            background: linear-gradient(180deg, {DARK_WINE} 0%, {DEEP_BURGUNDY} 55%, #230312 100%);
+            border-right: 1px solid rgba(255,255,255,0.08);
+        }}
+
+        section[data-testid="stSidebar"] * {{
+            color: #ffffff;
+        }}
+
+        .sidebar-title {{
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: white;
+            margin-bottom: 0.2rem;
+            letter-spacing: -0.02em;
+        }}
+
+        .sidebar-subtitle {{
+            font-size: 0.72rem;
+            color: {GOLD};
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            font-weight: 800;
+            margin-bottom: 1rem;
+        }}
+
+        .hero {{
+            background: linear-gradient(135deg, {DARK_WINE} 0%, {DEEP_BURGUNDY} 48%, {MID_BURGUNDY} 100%);
+            border-radius: 28px;
+            padding: 3.2rem 3.4rem;
+            color: white;
+            box-shadow: 0 22px 60px rgba(58,7,28,0.28);
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 1.5rem;
+        }}
+
+        .hero:before {{
+            content: "";
+            position: absolute;
+            width: 420px;
+            height: 420px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(201,162,39,0.30), rgba(201,162,39,0));
+            right: -110px;
+            top: -140px;
+        }}
+
+        .hero:after {{
+            content: "";
+            position: absolute;
+            width: 340px;
+            height: 340px;
+            border-radius: 50%;
+            border: 1px solid rgba(255,255,255,0.10);
+            right: 80px;
+            bottom: -180px;
+        }}
+
+        .hero-content {{
+            position: relative;
+            z-index: 2;
+        }}
+
+        .eyebrow {{
+            display: inline-block;
+            background: rgba(201,162,39,0.16);
+            color: #FFE7A3;
+            border: 1px solid rgba(201,162,39,0.42);
+            padding: 0.42rem 0.72rem;
+            border-radius: 999px;
+            font-size: 0.72rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 1.2rem;
+        }}
+
+        .hero h1 {{
+            color: white;
+            font-size: 2.75rem;
+            line-height: 1.05;
+            letter-spacing: -0.045em;
+            margin: 0 0 1rem 0;
+            max-width: 980px;
+            font-weight: 850;
+        }}
+
+        .hero p {{
+            color: rgba(255,255,255,0.84);
+            font-size: 1.05rem;
+            line-height: 1.65;
+            max-width: 960px;
+            margin: 0;
+        }}
+
+        .meta-row {{
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.8rem;
+            margin-top: 1.4rem;
+        }}
+
+        .meta-pill {{
+            background: rgba(255,255,255,0.10);
+            border: 1px solid rgba(255,255,255,0.16);
+            color: white;
+            padding: 0.5rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.82rem;
+            font-weight: 700;
+        }}
+
+        .kpi-card {{
+            background: white;
+            border: 1px solid {BORDER_GREY};
+            border-radius: 20px;
+            padding: 1.25rem 1.2rem;
+            box-shadow: 0 12px 36px rgba(20,20,20,0.05);
+            height: 100%;
+        }}
+
+        .kpi-label {{
+            color: {MUTED_TEXT};
+            font-size: 0.76rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 0.55rem;
+        }}
+
+        .kpi-value {{
+            color: {DEEP_BURGUNDY};
+            font-size: 1.35rem;
+            font-weight: 850;
+            letter-spacing: -0.025em;
+            line-height: 1.2;
+        }}
+
+        .kpi-note {{
+            color: {MUTED_TEXT};
+            font-size: 0.78rem;
+            margin-top: 0.6rem;
+            line-height: 1.45;
+        }}
+
+        .section-card {{
+            background: white;
+            border: 1px solid {BORDER_GREY};
+            border-radius: 24px;
+            padding: 1.8rem 2rem;
+            box-shadow: 0 12px 40px rgba(20,20,20,0.045);
+            margin-bottom: 1.2rem;
+        }}
+
+        .section-card h2, .section-card h3 {{
+            color: {DEEP_BURGUNDY};
+            letter-spacing: -0.02em;
+        }}
+
+        .section-card p {{
+            color: {DARK_TEXT};
+            line-height: 1.72;
+            font-size: 0.98rem;
+        }}
+
+        .insight-box {{
+            background: linear-gradient(135deg, #FFF9EA 0%, #FFFFFF 100%);
+            border-left: 5px solid {GOLD};
+            border-radius: 16px;
+            padding: 1.15rem 1.25rem;
+            color: {DARK_TEXT};
+            box-shadow: 0 8px 24px rgba(201,162,39,0.12);
+            margin: 1rem 0;
+            line-height: 1.65;
+        }}
+
+        .burgundy-callout {{
+            background: linear-gradient(135deg, {DEEP_BURGUNDY} 0%, {DARK_WINE} 100%);
+            color: white;
+            border-radius: 22px;
+            padding: 1.5rem 1.6rem;
+            margin: 1.2rem 0;
+            box-shadow: 0 16px 42px rgba(91,14,45,0.22);
+        }}
+
+        .burgundy-callout h3 {{
+            color: white;
+            margin-top: 0;
+        }}
+
+        .burgundy-callout p {{
+            color: rgba(255,255,255,0.86);
+            line-height: 1.65;
+        }}
+
+        .report-table-wrap {{
+            border: 1px solid {BORDER_GREY};
+            border-radius: 18px;
+            overflow: hidden;
+            box-shadow: 0 10px 28px rgba(20,20,20,0.045);
+            margin: 1rem 0 1.4rem 0;
+        }}
+
+        .report-table-title {{
+            background: {DEEP_BURGUNDY};
+            color: white;
+            padding: 0.9rem 1rem;
+            font-weight: 800;
+            font-size: 0.86rem;
+            letter-spacing: 0.02em;
+        }}
+
+        table.report-table {{
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }}
+
+        table.report-table th {{
+            background: #F5EEF2;
+            color: {DEEP_BURGUNDY};
+            padding: 0.85rem;
+            text-align: left;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            border-bottom: 1px solid {BORDER_GREY};
+        }}
+
+        table.report-table td {{
+            padding: 0.85rem;
+            border-bottom: 1px solid #EEF0F2;
+            color: {DARK_TEXT};
+            font-size: 0.88rem;
+            vertical-align: top;
+        }}
+
+        table.report-table tr:nth-child(even) td {{
+            background: #FAFAFB;
+        }}
+
+        .footer {{
+            text-align: center;
+            color: {MUTED_TEXT};
+            font-size: 0.78rem;
+            padding: 1.4rem 0 0.5rem 0;
+            border-top: 1px solid {BORDER_GREY};
+            margin-top: 2rem;
+        }}
+
+        /* Compact login */
+        .login-shell {{
+            max-width: 430px;
+            margin: 8vh auto 0 auto;
+            background: white;
+            border-radius: 24px;
+            padding: 2rem;
+            border: 1px solid {BORDER_GREY};
+            box-shadow: 0 22px 70px rgba(58,7,28,0.14);
+        }}
+
+        .login-brand {{
+            text-align: center;
+            color: {DEEP_BURGUNDY};
+            font-size: 1.45rem;
+            font-weight: 850;
+            margin-bottom: 0.2rem;
+            letter-spacing: -0.02em;
+        }}
+
+        .login-sub {{
+            text-align: center;
+            color: {GOLD};
+            font-size: 0.74rem;
+            text-transform: uppercase;
+            font-weight: 850;
+            letter-spacing: 0.08em;
+            margin-bottom: 1.1rem;
+        }}
+
+        div[data-testid="stTextInput"] input {{
+            border-radius: 10px !important;
+            border: 1px solid {BORDER_GREY} !important;
+            padding: 0.55rem 0.75rem !important;
+            min-height: 38px !important;
+            font-size: 0.9rem !important;
+        }}
+
+        .stButton > button {{
+            background: linear-gradient(135deg, {DEEP_BURGUNDY}, {DARK_WINE}) !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 10px !important;
+            font-weight: 800 !important;
+            min-height: 40px !important;
+            box-shadow: 0 10px 24px rgba(91,14,45,0.22);
+        }}
+
+        .stButton > button:hover {{
+            transform: translateY(-1px);
+            box-shadow: 0 14px 30px rgba(91,14,45,0.32);
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+# =========================================================
+# AUTHENTICATION
+# =========================================================
+def render_login():
+    st.markdown(
+        """
+        <div class="login-shell">
+            <div class="login-brand">Strategic Market Research</div>
+            <div class="login-sub">Secure Client Preview</div>
+            <p style="text-align:center; color:#666666; font-size:0.9rem; line-height:1.55; margin-bottom:1.2rem;">
+                Confidential sample dashboard prepared for Menarini.
+                Please enter authorized access credentials.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    col1, col2, col3 = st.columns([1.1, 0.85, 1.1])
+    with col2:
+        username = st.text_input("Username", placeholder="Enter username")
+        password = st.text_input("Password", type="password", placeholder="Enter password")
+        login = st.button("Enter Dashboard", use_container_width=True)
+
+    if login:
+        if username == USERNAME and password == PASSWORD:
+            st.session_state["authenticated"] = True
+            st.rerun()
         else:
-            st.session_state["password_correct"] = False
+            st.error("Invalid credentials. Please check username and password.")
 
-    if "password_correct" not in st.session_state:
-        # First run, show inputs for username + password.
-        st.markdown("<div style='text-align: center; padding: 50px;'>", unsafe_allow_html=True)
-        st.image("https://img.icons8.com/ios-filled/100/800020/security-configuration.png")
-        st.markdown("<h2 style='color: #800020;'>Strategic Market Research Portal</h2>", unsafe_allow_html=True)
-        st.text_input("Username", on_change=None, key="username")
-        st.text_input("Password", type="password", on_change=None, key="password")
-        if st.button("Log In"):
-            password_entered()
-            if not st.session_state.get("password_correct", False):
-                 st.error("😕 User not known or password incorrect")
-        st.markdown("</div>", unsafe_allow_html=True)
-        return False
-    else:
-        return st.session_state["password_correct"]
-
-if not check_password():
     st.stop()
 
-# =============================================================================
-# 3. DATA & CALCULATIONS (Parsed from Report.txt)
-# =============================================================================
-# Global TAM Data
-df_tam = pd.DataFrame({
-    "Market Layer": ["Global Practical TAM", "Menarini Territory TAM", "CETP SAM Potential", "Menarini SOM Revenue"],
-    "2025": [31800.0, 9015.0, 0.0, 0.0],
-    "2030": [38319.0, 10643.6, 6688.9, 181.7],
-    "2035": [46174.3, 12568.4, 6709.2, 468.1],
-    "CAGR": ["3.8%", "3.4%", "Activated 2027", "Launch-driven"]
-})
 
-# Patient Funnel Data
-funnel_data = pd.DataFrame({
-    "Stage": ["Adult Pop", "Diagnosed", "Treated", "Uncontrolled", "Relevant", "Reachable"],
-    "Value": [507.4, 161.1, 102.3, 42.1, 17.5, 4.4]
-})
+def check_authentication():
+    if "authenticated" not in st.session_state:
+        st.session_state["authenticated"] = False
 
-# Geographic Splits 2035
-geo_data = pd.DataFrame({
-    "Country": ["Germany", "UK", "France", "Italy", "Spain", "Switzerland", "Rest of Europe"],
-    "Revenue": [142.2, 72.2, 76.4, 52.5, 32.6, 17.4, 74.8]
-})
+    if not st.session_state["authenticated"]:
+        render_login()
 
-# =============================================================================
-# 4. SIDEBAR NAVIGATION
-# =============================================================================
-with st.sidebar:
-    st.markdown("<div style='padding: 20px 0;'><h2 style='color: white; border:none;'>SMR</h2><p style='color: #D4AF37; font-size: 0.8rem; font-weight:bold;'>STRATEGIC MARKET RESEARCH</p></div>", unsafe_allow_html=True)
-    st.markdown('<p class="nav-label">Report Navigation</p>', unsafe_allow_html=True)
-    
-    page = st.radio("Go to", [
-        "1. Executive Overview",
-        "2. Market Architecture",
-        "3. Disease Burden & Funnel",
-        "4. Forecast & SOM Trajectory",
-        "5. Country Analysis",
-        "6. Competitive Landscape",
-        "7. Scenario & Risk Analysis"
-    ], label_visibility="collapsed")
-    
-    st.markdown("---")
-    st.markdown("""
-        <div style='font-size: 0.7rem; opacity: 0.8;'>
-            <b>Prepared for:</b><br>Menarini Group<br><br>
-            <b style='color: #D4AF37;'>CONFIDENTIAL DATA</b><br>
-            © 2026 SMR Global
+
+# =========================================================
+# REUSABLE RENDER HELPERS
+# =========================================================
+def render_footer():
+    st.markdown(
+        """
+        <div class="footer">
+            © 2026 Strategic Market Research. Confidential sample report preview prepared for Menarini.
+            Full quantitative outputs available in the complete report.
         </div>
-    """, unsafe_allow_html=True)
+        """,
+        unsafe_allow_html=True,
+    )
 
-# =============================================================================
-# 5. PAGE CONTENT
-# =============================================================================
 
-# Header
-st.markdown('<p style="color: #D4AF37; font-weight: bold; letter-spacing: 0.2em; font-size: 0.8rem; margin-bottom:0;">INTERACTIVE STRATEGY DOCUMENT</p>', unsafe_allow_html=True)
-st.title("Global CETP Inhibitors Market, 2025–2035")
-st.markdown('<h3 style="margin-top: -20px; color: #4B5563 !important;">Obicetrapib-Led Lipid-Lowering Opportunity</h3>', unsafe_allow_html=True)
-st.markdown("---")
-
-if page == "1. Executive Overview":
-    st.header("1. Executive Overview & Strategic Snapshot")
-    
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        st.subheader("1.1. Strategic Market Thesis")
-        st.write("""
-        The global landscape for lipid-lowering therapies (LLT) is currently undergoing a structural transformation, 
-        characterized by the emergence of high-efficacy oral alternatives to established injectable biologics. 
-        The CETP inhibitor class, once sidelined, is being revived through **obicetrapib**. [cite: 2, 3]
-        """)
-        st.write("""
-        As of 2025, the strict CETP inhibitor market generates zero commercial revenue. [cite: 4] 
-        However, the potential is anchored in a massive landscape where patients fail to achieve LDL-C goals. 
-        Menarini’s role is focused on the successful navigation of European HTA and payer landscapes for obicetrapib monotherapy and its FDC with ezetimibe. [cite: 5, 12]
-        """)
-    
-    with col2:
-        st.markdown("""
-        <div style="background-color: white; padding: 20px; border-radius: 10px; border-left: 5px solid #D4AF37;">
-            <p style="color: #800020; font-weight: bold; margin-bottom: 5px;">STRATEGIC IMPERATIVE</p>
-            <p style="font-size: 0.9rem; color: #1F2937;">Position obicetrapib as a "biologic-like" oral alternative to win in the uncontrolled high-risk pool. [cite: 13, 14]</p>
+def render_kpi_card(label, value, note=""):
+    st.markdown(
+        f"""
+        <div class="kpi-card">
+            <div class="kpi-label">{label}</div>
+            <div class="kpi-value">{value}</div>
+            <div class="kpi-note">{note}</div>
         </div>
-        """, unsafe_allow_html=True)
+        """,
+        unsafe_allow_html=True,
+    )
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    
-    # KPI Grid
-    kpi1, kpi2, kpi3, kpi4 = st.columns(4)
-    with kpi1:
-        st.markdown('<div class="kpi-card"><p class="kpi-title">Global Practical TAM</p><p class="kpi-value">$31.8B</p></div>', unsafe_allow_html=True)
-    with kpi2:
-        st.markdown('<div class="kpi-card kpi-card-gold"><p class="kpi-title">Addressable SAM</p><p class="kpi-value">$6.7B</p></div>', unsafe_allow_html=True)
-    with kpi3:
-        st.markdown('<div class="kpi-card"><p class="kpi-title">2035 SOM (Base)</p><p class="kpi-value">$468.1M</p></div>', unsafe_allow_html=True)
-    with kpi4:
-        st.markdown('<div class="kpi-card kpi-card-gold"><p class="kpi-title">FDC Revenue Share</p><p class="kpi-value">61.9%</p></div>', unsafe_allow_html=True)
 
-elif page == "2. Market Architecture":
-    st.header("2. Market Definition & Architecture")
-    st.write("The report employs a strict revenue recognition logic where the category size is $0 until regulatory approval. [cite: 19]")
-    
-    st.markdown("""
-    <table class="styled-table">
-        <thead>
-            <tr>
-                <th>Market Layer</th>
-                <th>Definition</th>
-                <th>Starts From</th>
-                <th>Relevance to Menarini</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td><b>Strict CETP Market</b></td>
-                <td>Revenue from approved CETP inhibitors only.</td>
-                <td>2027 (Launch)</td>
-                <td>Represents client product sales. [cite: 21]</td>
-            </tr>
-            <tr>
-                <td><b>Practical TAM</b></td>
-                <td>Current revenue of all relevant lipid-lowering therapies.</td>
-                <td>2025</td>
-                <td>Competitive revenue pool. [cite: 21]</td>
-            </tr>
-            <tr>
-                <td><b>SAM</b></td>
-                <td>CETP-addressable subset post-label and access filters.</td>
-                <td>2027</td>
-                <td>Territory volume potential. [cite: 21]</td>
-            </tr>
-        </tbody>
-    </table>
-    """, unsafe_allow_html=True)
+def render_section_card(title, body):
+    masked_body = mask_sensitive_numbers(body)
+    st.markdown(
+        f"""
+        <div class="section-card">
+            <h2>{title}</h2>
+            <div>{masked_body}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-elif page == "3. Disease Burden & Funnel":
-    st.header("3. Disease Burden & Addressable Patient Pool")
-    
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        st.subheader("Patient Conversion Logic")
-        st.write("""
-        Cardiovascular disease remains the leading cause of death in Europe. [cite: 30] 
-        Adult populations exhibit hypercholesterolemia prevalence between 40-49%. 
-        The primary challenge is "funneling" this population into a reachable, high-risk base. [cite: 30, 31]
-        """)
-        st.markdown('<p class="redacted">41% OF TREATED PATIENTS REMAIN UNCONTROLLED</p>', unsafe_allow_html=True)
-    
-    with col2:
-        fig = go.Figure(go.Funnel(
-            y = funnel_data["Stage"],
-            x = funnel_data["Value"],
-            marker = {"color": ["#E5E7EB", "#9CA3AF", "#e6c86a", "#D4AF37", "#800020", "#4b0012"]},
-            textinfo = "value+percent initial"
-        ))
-        fig.update_layout(title="Menarini Territory Patient Funnel (Mn Patients)", height=400, margin=dict(l=20, r=20, t=50, b=20))
-        st.plotly_chart(fig, use_container_width=True)
 
-elif page == "4. Forecast & SOM Trajectory":
-    st.header("4. Market Size & Forecast, 2025–2035")
-    
-    # Forecast Data for Plotting
-    years = [2025, 2027, 2030, 2035]
-    som_vals = [0, 10.8, 181.7, 468.1]
-    
-    fig = px.line(x=years, y=som_vals, labels={'x': 'Year', 'y': 'Revenue ($Mn)'}, title="Menarini SOM Revenue Trajectory")
-    fig.update_traces(line_color='#800020', line_width=4, mode='lines+markers')
-    fig.update_layout(plot_bgcolor='white')
-    st.plotly_chart(fig, use_container_width=True)
-    
-    st.markdown("### Executive Market Sizing Summary ($Mn)")
-    st.table(df_tam.set_index("Market Layer"))
-    st.write("Insight: Menarini SOM experiences a rapid ramp-up following 2027 reimbursement. [cite: 7]")
+def render_html_table(title, rows):
+    if not rows:
+        return
 
-elif page == "5. Country Analysis":
-    st.header("5. Europe, UK & Switzerland Opportunity Analysis")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        fig = px.pie(geo_data, values='Revenue', names='Country', 
-                     title='2035 SOM Revenue Distribution',
-                     color_discrete_sequence=['#800020', '#99334d', '#B91C1C', '#DC2626', '#D4AF37', '#e6c86a', '#F3F4F6'])
-        fig.update_traces(textposition='inside', textinfo='percent+label')
-        st.plotly_chart(fig, use_container_width=True)
-        
-    with col2:
-        st.subheader("Launch Sequencing & Access")
-        st.write("""
-        **Germany and the UK** drive early value due to their 2027 reimbursement activation. [cite: 78] 
-        Wave 2 markets (France, Italy, Spain) follow in 2028. [cite: 59, 80]
-        """)
-        st.info("Switzerland offers the highest net price potential ($1,200/yr). [cite: 79]")
+    columns = list(rows[0].keys())
 
-elif page == "6. Competitive Landscape":
-    st.header("6. Competitive Landscape & Substitute Pressure")
-    st.write("Direct competition is non-existent; however, indirect competition determines adoption ceilings. [cite: 81]")
-    
-    st.markdown("""
-    <table class="styled-table">
-        <thead>
-            <tr>
-                <th>Therapy Class</th>
-                <th>Route</th>
-                <th>Efficacy (LDL-C)</th>
-                <th>Threat Profile</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td><b>Obicetrapib FDC</b></td>
-                <td>Oral</td>
-                <td>~49% Reduction</td>
-                <td><b style="color: green;">Target Asset</b></td>
-            </tr>
-            <tr>
-                <td>Bempedoic Acid</td>
-                <td>Oral</td>
-                <td>~18% Reduction</td>
-                <td><b style="color: red;">High (Direct Oral)</b></td>
-            </tr>
-            <tr>
-                <td>PCSK9 mAbs</td>
-                <td>Injectable</td>
-                <td>~60% Reduction</td>
-                <td><b style="color: red;">High (Efficacy Ceiling)</b></td>
-            </tr>
-            <tr>
-                <td>Inclisiran</td>
-                <td>Injectable</td>
-                <td>~50% Reduction</td>
-                <td><b>Moderate (Long-acting)</b></td>
-            </tr>
-        </tbody>
-    </table>
-    """, unsafe_allow_html=True)
+    header_html = "".join([f"<th>{col}</th>" for col in columns])
+    body_html = ""
 
-elif page == "7. Scenario & Risk Analysis":
-    st.header("7. Scenario Analysis & Forecast Sensitivities")
-    
-    # Scenario Chart
-    sc_years = [2025, 2030, 2035]
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=sc_years, y=[0, 417.5, 1075.3], name='Upside Case', line=dict(color='green', dash='dash')))
-    fig.add_trace(go.Scatter(x=sc_years, y=[0, 181.7, 468.1], name='Base Case', line=dict(color='#800020', width=4)))
-    fig.add_trace(go.Scatter(x=sc_years, y=[0, 90, 250], name='Downside Case', line=dict(color='red', dash='dot')))
-    
-    fig.update_layout(title="Revenue Scenario Outcomes ($Mn)", plot_bgcolor='white')
-    st.plotly_chart(fig, use_container_width=True)
-    
-    st.subheader("Key Market Risks")
-    risk_col1, risk_col2 = st.columns(2)
-    with risk_col1:
-        st.error("**Narrow Label (High Severity)**: Reduces SAM by 40%. [cite: 102]")
-        st.warning("**Class Skepticism**: Slows adoption ramp for cardiologists. [cite: 89, 102]")
-    with risk_col2:
-        st.warning("**Price Pressure**: HAS/CEPS and regional variations in Italy/Spain. [cite: 59, 102]")
-        st.info("**Injectable Substitution**: PCSK9 efficacy remains a ceiling. [cite: 40, 102]")
+    for row in rows:
+        body_html += "<tr>"
+        for col in columns:
+            body_html += f"<td>{row.get(col, '')}</td>"
+        body_html += "</tr>"
 
-# =============================================================================
-# 6. FOOTER
-# =============================================================================
-st.markdown("---")
-st.markdown("""
-    <div style="text-align: center; color: #6B7280; font-size: 0.75rem; padding-bottom: 20px;">
-        CONFIDENTIAL DASHBOARD PREPARED FOR MENARINI GROUP | DATA VALID AS OF 2026<br>
-        Source Registry: 1: Model patient funnel; 2: Pricing engine; 3: Workbook extractions.
-    </div>
-""", unsafe_allow_html=True)
+    st.markdown(
+        f"""
+        <div class="report-table-wrap">
+            <div class="report-table-title">{title}</div>
+            <table class="report-table">
+                <thead><tr>{header_html}</tr></thead>
+                <tbody>{body_html}</tbody>
+            </table>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+# =========================================================
+# CHART 1 — TAM / SAM / SOM FUNNEL
+# =========================================================
+def create_tam_sam_som_funnel():
+    labels = [
+        "Lipid-Lowering Therapy Revenue Pool",
+        "CETP-Relevant Opportunity",
+        "Obicetrapib-Addressable Pool",
+        "Menarini Commercial Opportunity",
+    ]
+
+    # Symbolic values only for rendering shape; not displayed to users.
+    values = [100, 72, 46, 24]
+
+    fig = go.Figure(
+        go.Funnel(
+            y=labels,
+            x=values,
+            text=[
+                "US$ [Proprietary]",
+                "US$ [Proprietary]",
+                "US$ [Proprietary]",
+                "US$ [Proprietary]",
+            ],
+            textinfo="text",
+            marker=dict(
+                color=[DEEP_BURGUNDY, MID_BURGUNDY, SOFT_ROSE, GOLD],
+                line=dict(color="white", width=2),
+            ),
+            hovertemplate="<b>%{y}</b><br>Value: US$ [Proprietary]<extra></extra>",
+        )
+    )
+
+    fig.update_layout(
+        title=dict(
+            text="TAM / SAM / SOM Preview — Masked Market Architecture",
+            x=0.02,
+            y=0.95,
+            font=dict(size=18, color=DEEP_BURGUNDY),
+        ),
+        paper_bgcolor=WHITE,
+        plot_bgcolor=WHITE,
+        margin=dict(l=20, r=20, t=70, b=30),
+        height=420,
+        font=dict(color=DARK_TEXT, size=12),
+    )
+
+    fig.update_xaxes(visible=False)
+    return fig
+
+
+# =========================================================
+# COVER PAGE
+# =========================================================
+def render_cover_page():
+    st.markdown(
+        """
+        <div class="hero">
+            <div class="hero-content">
+                <div class="eyebrow">Confidential Sample Report Preview</div>
+                <h1>Global CETP Inhibitors Market, 2025–2035</h1>
+                <p>
+                    Obicetrapib, next-generation lipid-lowering therapy and strategic positioning for Menarini.
+                    This digital preview demonstrates the analytical structure, commercial logic and strategic depth
+                    of the full report while intentionally masking proprietary market values.
+                </p>
+                <div class="meta-row">
+                    <div class="meta-pill">Prepared by Strategic Market Research</div>
+                    <div class="meta-pill">Prepared for Menarini</div>
+                    <div class="meta-pill">Forecast Horizon: 2025–2035</div>
+                    <div class="meta-pill">Full quantitative model available in complete report</div>
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    kpi_cols = st.columns(6)
+    with kpi_cols[0]:
+        render_kpi_card("Global Market Opportunity", "US$ [Proprietary]", "Full TAM disclosed in report")
+    with kpi_cols[1]:
+        render_kpi_card("Europe / UK / Switzerland SAM", "US$ [Proprietary]", "Filtered access pool")
+    with kpi_cols[2]:
+        render_kpi_card("Menarini SOM Potential", "US$ [Proprietary]", "Launch-driven revenue view")
+    with kpi_cols[3]:
+        render_kpi_card("Launch Window", "Available in Full Report", "Regulatory and reimbursement logic")
+    with kpi_cols[4]:
+        render_kpi_card("Eligible Patient Pool", "[Proprietary] patients", "High-risk LDL-C gap")
+    with kpi_cols[5]:
+        render_kpi_card("Forecast Horizon", "2025–2035", "Market creation window")
+
+
+# =========================================================
+# SECTION 1 — EXECUTIVE SNAPSHOT
+# =========================================================
+def render_executive_snapshot():
+    st.markdown(
+        """
+        <div class="section-card">
+            <h2>Executive Overview & Strategic Snapshot</h2>
+            <p>
+                The CETP inhibitor category represents a near-launch market creation opportunity rather than a mature
+                therapy class. Obicetrapib is positioned as the key revival asset, with Menarini’s commercial opportunity
+                concentrated in high-risk, uncontrolled LDL-C patients across Europe, the UK and Switzerland.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    render_html_table(
+        "TABLE 1: Executive Market Sizing Summary — Masked Preview ($Mn, 2025–2035)",
+        EXECUTIVE_MARKET_TABLE,
+    )
+
+    st.markdown(
+        """
+        <div class="insight-box">
+            <strong>Strategic interpretation:</strong>
+            The practical TAM represents the existing lipid-lowering budget pool, while SAM and SOM narrow the opportunity
+            to post-label, reimbursable and Menarini-capturable demand. The sample dashboard masks values; the full report
+            unlocks market sizing tables, country-level revenue forecasts and patient funnel assumptions.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.plotly_chart(create_tam_sam_som_funnel(), use_container_width=True)
+
+    with st.expander("Read full executive summary text — masked", expanded=True):
+        st.markdown(mask_sensitive_numbers(REPORT_SECTIONS["Cover & Executive Snapshot"]))
+
+    st.markdown(
+        """
+        <div class="burgundy-callout">
+            <h3>Menarini-facing implication</h3>
+            <p>
+                Commercial success depends on positioning obicetrapib as a high-efficacy oral intensification option
+                that can sit between generic oral therapies and injectable biologics. The full report details launch
+                sequencing, payer evidence requirements, FDC positioning and country-level prioritization.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+# =========================================================
+# SIDEBAR NAVIGATION
+# =========================================================
+def render_sidebar():
+    st.sidebar.markdown('<div class="sidebar-title">Strategic Market Research</div>', unsafe_allow_html=True)
+    st.sidebar.markdown('<div class="sidebar-subtitle">Menarini CETP Preview</div>', unsafe_allow_html=True)
+
+    pages = [
+        "Cover & Executive Snapshot",
+        "Market Architecture",
+        "CETP Inhibitor Opportunity Logic",
+        "Menarini / Obicetrapib Strategic Fit",
+        "TAM / SAM / SOM Preview",
+        "Competitive Landscape",
+        "Clinical & Regulatory Readiness",
+        "Pricing, Access & Adoption",
+        "Regional Launch Prioritization",
+        "Risk, Barriers & Watchpoints",
+        "Strategic Recommendations",
+        "Why Menarini Should Access the Full Report",
+        "Full Report Summary Explorer",
+    ]
+
+    selected = st.sidebar.radio("Dashboard Navigation", pages, label_visibility="collapsed")
+
+    st.sidebar.markdown("---")
+    st.sidebar.caption("Confidential preview. Proprietary values masked.")
+    if st.sidebar.button("End Secure Session", use_container_width=True):
+        st.session_state["authenticated"] = False
+        st.rerun()
+
+    return selected
+
+
+# =========================================================
+# PLACEHOLDER FOR NEXT SECTIONS
+# =========================================================
+def render_placeholder(page_name):
+    st.markdown(
+        f"""
+        <div class="section-card">
+            <h2>{page_name}</h2>
+            <p>
+                This section will be added in the next build step. The final dashboard will include full-length masked
+                report content, structured tables, strategic callouts and advanced Plotly visuals for each section.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+# =========================================================
+# MAIN APP
+# =========================================================
+def main():
+    inject_css()
+    check_authentication()
+
+    selected_page = render_sidebar()
+
+    if selected_page == "Cover & Executive Snapshot":
+        render_cover_page()
+        render_executive_snapshot()
+    else:
+        render_placeholder(selected_page)
+
+    render_footer()
+
+
+if __name__ == "__main__":
+    main()
