@@ -1,107 +1,44 @@
-import streamlit as st
-import pandas as pd
-import numpy as np
-import plotly.graph_objects as go
 import re
+import html
+import streamlit as st
 
 
-"""
-This Streamlit application is a premium, consulting‑grade preview of the
-Strategic Market Research report titled “Global CETP Inhibitors Market,
-2025–2035: Obicetrapib, Next‑Generation Lipid‑Lowering Therapy & Strategic
-Positioning for Menarini”.  It is designed to look and feel like a digital
-report rather than a basic text viewer.  A secure login gate protects the
-contents, and after authentication the user is presented with a clean
-navigation sidebar, a rich cover page, KPI teaser cards, interactive
-Plotly charts, structured tables, and a full report summary explorer.
-
-All market‑sensitive numbers in the underlying text are automatically
-masked using a regular expression–based function.  This ensures that
-proprietary values such as revenues, percentages, patient counts, and
-forecasts never leak in the sample preview.  The unmasked report
-paragraphs are embedded directly in this file so there are no external
-dependencies when deploying to Streamlit Cloud.  Only pandas and
-Plotly are used to construct the tables and figures.
-"""
-
-# -----------------------------------------------------------------------------
+# =============================================================================
 # PAGE CONFIGURATION
-# -----------------------------------------------------------------------------
+# =============================================================================
 st.set_page_config(
-    page_title="Global CETP Inhibitors Market Preview (2025–2035)",
+    page_title="Global CETP Inhibitors Market Preview | Menarini",
     page_icon="🩺",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# -----------------------------------------------------------------------------
-# THEME COLOURS
-# -----------------------------------------------------------------------------
+
+# =============================================================================
+# THEME COLORS
+# =============================================================================
 BURGUNDY = "#5B0E2D"
 BURGUNDY_DARK = "#3A071C"
 MID_BURGUNDY = "#8D1645"
 SOFT_ROSE = "#D8A7B1"
 GOLD = "#C9A227"
 LIGHT_GREY = "#F4F5F7"
+WHITE = "#FFFFFF"
 DARK_TEXT = "#2B2B2B"
 MUTED_TEXT = "#666666"
-WHITE = "#FFFFFF"
 BORDER_GREY = "#E1E4E8"
 
-# -----------------------------------------------------------------------------
-# MASKING UTILITY
-# -----------------------------------------------------------------------------
-def mask_sensitive_numbers(text: str) -> str:
-    """
-    Replace market‑sensitive numeric values in a given text with professional
-    placeholders.  The masking logic targets currency values, percentages,
-    large numbers with comma separators or decimal points, units such as Mn,
-    million, billion, CAGR and patient counts.  Years such as 2025–2035
-    remain visible.  When in doubt the function errs on the side of masking.
 
-    Parameters
-    ----------
-    text : str
-        Raw report text potentially containing numeric values.
-
-    Returns
-    -------
-    str
-        Text with proprietary numbers replaced by placeholders.
-    """
-    patterns = [
-        # Currency values prefaced with US$ or $ (e.g. US$32.4, $2.5)
-        (r"US\$\s?\d[\d,\.]*", "US$ [Proprietary]"),
-        (r"\$\s?\d[\d,\.]*", "$ [Proprietary]"),
-        # Percentages (e.g. 9.2%)
-        (r"\d+(\.\d+)?\s?%", "[Proprietary]%"),
-        # Mn / million / billion qualifiers
-        (r"\d+(\.\d+)?\s?mn\b", "[Proprietary] Mn"),
-        (r"\d+(\.\d+)?\s?million", "[Proprietary] million"),
-        (r"\d+(\.\d+)?\s?billion", "[Proprietary] billion"),
-        # CAGR qualifiers
-        (r"\d+(\.\d+)?\s?cagr", "[Proprietary] CAGR"),
-        # Patients qualifier
-        (r"\d+(\.\d+)?\s?patients", "[Proprietary] patients"),
-        # Numbers with thousands separators (31,800.0)
-        (r"\d{1,3}(?:,\d{3})+(?:\.\d+)?", "[Proprietary]"),
-        # Decimals (6.9) not part of mg dosing (we mask all decimals to be safe)
-        (r"(?<!\d)\d+\.\d+", "[Proprietary]"),
-        # Large integers (four or more digits) that do not begin with 19 or 20
-        (r"\b(?!(19|20))\d{4,}\b", "[Proprietary]"),
-    ]
-    masked = text
-    for pattern, repl in patterns:
-        masked = re.sub(pattern, repl, masked, flags=re.IGNORECASE)
-    return masked
+# =============================================================================
+# LOGIN CREDENTIALS
+# =============================================================================
+USERNAME = "SMR"
+PASSWORD = "SMR@2026"
 
 
-# -----------------------------------------------------------------------------
-# EMBEDDED REPORT TEXT
-# -----------------------------------------------------------------------------
-# The full report summary is embedded verbatim below.  All content must be
-# contained in this file to satisfy deployment requirements.  Do not edit
-# the textual content except to wrap it inside the triple‑quoted string.
+# =============================================================================
+# REPORT TEXT
+# =============================================================================
 REPORT_TEXT = r"""
 Global CETP Inhibitors Market, 2025–2035: Obicetrapib-Led Lipid-Lowering Opportunity, TAM/SAM/SOM Buildout & Strategic Positioning for Menarini
 ## 1. Executive Overview & Strategic Snapshot ($Mn, %, 2025–2035)
@@ -198,1049 +135,1956 @@ Analysis indicates that the full cardiovascular drug market is excluded because 
 3.1. CETP Biology and Mechanism of Action
 CETP is a plasma protein that facilitates the exchange of cholesteryl esters from HDL to apoB-containing lipoproteins (VLDL and LDL) in exchange for triglycerides.1 Historically, the industry focused on CETP inhibition as a mechanism to raise HDL-C, the "good cholesterol." However, contemporary clinical logic has shifted toward reducing the atherogenic burden of LDL-C and apoB particles.3 Obicetrapib is a highly selective and potent inhibitor that achieves robust LDL-C reduction at a low 10mg dose, differentiating its pharmacological profile from earlier, less selective molecules.6
 3.2. Historical Class Failures and Commercial Lessons
-(… the complete report text continues …)
+The CETP class has a volatile clinical history that necessitates a strategic rebuilding of physician and payer trust. Analysis of historical assets reveals that failures were largely due to off-target effects or lack of clinical event reduction rather than a failure of the mechanism itself.1
+TABLE 3: Historical CETP Asset Comparison & Lessons
+
+Asset
+Company
+Status
+Key Issue / Outcome
+Commercial Lesson
+Torcetrapib
+Pfizer
+Discontinued
+Off-target toxicity / mortality
+Safety is paramount; avoid BP elevation 1
+Dalcetrapib
+Roche / DalCor
+Limited
+Efficacy neutrality in broad pool
+Potency in LDL-C reduction is required 1
+Evacetrapib
+Eli Lilly
+Discontinued
+Failed to show outcomes benefit
+Lipid changes must translate to MACE 1
+Anacetrapib
+Merck
+Discontinued
+Long half-life / Commercial stop
+Launch timing and differentiation matter 1
+
+The clinical trajectory demonstrates that obicetrapib avoids these historical pitfalls by maintaining a neutral blood pressure profile and achieving substantially higher LDL-C reduction (up to ~50% in combination) than predecessors.7
+3.3. Category Repositioning Logic
+Obicetrapib changes the class narrative by positioning itself as a highly selective oral alternative that bridges the efficacy gap between statins/ezetimibe and injectable biologics.3 To rebuild confidence, the commercial strategy must lead with the "Next-Generation" label, supported by the clean safety profile seen in Phase 3 trials.4 Payer and physician acceptance will depend on the dissemination of the BROADWAY and BROOKLYN data, which show consistent results across diverse populations.1 Outcomes data from the ongoing PREVAIL trial remains strategically vital, as proved cardiovascular benefit is the threshold for broad guideline inclusion and premium reimbursement in the post-statin landscape.1
+## 4. Disease Burden & Addressable Patient Pool
+4.1. Hypercholesterolemia Prevalence and High-Risk Segments
+Cardiovascular disease remains the leading cause of death in the WHO European region, causing over 10,000 deaths per day.14 Circulatory diseases specifically cause 32% of all deaths in the EU.15 Adult populations in core Menarini territories exhibit hypercholesterolemia prevalence rates between 40% and 49%.1 The primary commercial challenge is the "funneling" of this broad population into a reachable, high-risk, uncontrolled patient base.
+TABLE 4: Menarini Territory Patient Funnel Analysis (Mn Patients)
+
+Funnel Stage
+2025
+2030
+2035
+Interpretation
+Adult Population
+507.4
+508.5
+509.7
+Total population base across rights territory 1
+Diagnosed Patients
+161.1
+161.8
+162.6
+Diagnosis rates average 60%–65% 1
+Treated Patients
+102.3
+103.1
+103.9
+~63% of diagnosed receive treatment 1
+Uncontrolled LDL-C
+42.1
+42.4
+42.8
+~41% of treated patients fail to hit goals 1
+CETP-Relevant Pool
+17.5
+17.6
+17.8
+Filtered for high-risk and ASCVD 1
+Commercially Reachable
+4.4
+4.4
+4.5
+Specialist reach and access narrowed pool 1
+
+Analysis indicates that the "uncontrolled high-risk" pool is the critical demand engine. While the total hypercholesterolemic population is large, the commercially addressable market is narrowed by the requirement for specialist referral and the anticipated HTA restrictions that favor established generic therapies for low-risk patients.1
+4.2. Country-Level Demand and Distribution
+Demand is highly concentrated in Germany, which maintains the largest uncontrolled LDL-C pool in the territory. Italy and France follow, though their reachable pools are filtered more aggressively by specialist infrastructure and access predictability scores.1
+TABLE 5: 2025 Country-Level Demand Engine Summary (Mn Patients)
+Country
+Diagnosed
+Treated
+Uncontrolled
+CETP-Relevant
+Reachable Pool
+Germany
+24.84
+16.89
+7.09
+3.40
+1.02
+France
+18.98
+12.53
+5.39
+2.53
+0.68
+United Kingdom
+18.29
+12.07
+5.19
+2.39
+0.67
+Italy
+16.14
+10.49
+4.62
+2.12
+0.53
+Spain
+12.03
+7.58
+3.41
+1.53
+0.35
+Switzerland
+2.51
+1.75
+0.70
+0.32
+0.10
+
+Analysis demonstrates that Germany’s high treatment rate (68%) and physician infrastructure lead to a reachable pool of over 1 million patients, making it the anchor for the European launch.1 Conversely, while Italy has a large diagnosed population, the specialist reach factor (0.25) significantly reduces the early reachable pool, suggesting a more selective commercial ramp.1
+## 5. Current Treatment Landscape & Revenue Pool Benchmark ($Mn)
+5.1. The Lipid-Lowering Treatment Pathway
+The current lipid-lowering environment is a mature, volume-driven landscape where statins serve as the entrenched first-line therapy. The emergence of non-statin oral add-ons and high-efficacy injectables has created a tiered escalation pathway.
+TABLE 6: Current Therapy Class Landscape & Pathway Role
+
+Therapy Class
+Route
+Role in Pathway
+Pricing Tier
+Relevance to CETP Entry
+Generic Statins
+Oral
+1st-line standard
+Low
+Entrenched volume backbone 1
+Ezetimibe
+Oral
+1st-line add-on
+Low
+Sequencing benchmark; FDC anchor 1
+Bempedoic Acid
+Oral
+Oral non-statin
+Branded
+Closest branded oral comparator 1
+PCSK9 mAbs
+Injectable
+High-risk escalation
+High
+High-efficacy benchmark 1
+Inclisiran
+Injectable
+Long-acting specialist
+High
+Competitor for similar high-risk patients 1
+
+5.2. Practical TAM by Therapy Class ($Mn)
+The practical TAM represents the total monetized opportunity within which CETP inhibitors will compete for value share. This US$9 billion territory pool (2025) is dominated by premium injectables, which represent over half of total revenue despite serving a minority of patients.1
+TABLE 7: Relevant Treatment TAM by Therapy Class ($Mn)
+Therapy Class
+2025 Revenue
+2030 Revenue
+2035 Revenue
+CAGR
+PCSK9 mAbs
+3,065.1
+3,618.8
+4,273.2
+3.4%
+Inclisiran
+1,442.4
+1,702.9
+2,010.9
+3.4%
+Generic Statins
+1,622.7
+1,915.9
+2,262.3
+3.4%
+Ezetimibe (Add-on)
+1,081.8
+1,277.2
+1,508.2
+3.4%
+Bempedoic Acid
+721.2
+851.5
+1,005.5
+3.4%
+Other / Specialty
+1,081.8
+1,277.2
+1,508.2
+3.4%
+Territory Total
+9,015.0
+10,643.6
+12,568.4
+3.4%
+
+Insight: The dominance of the injectable biologics segment (PCSK9/Inclisiran) sets a high-efficacy ceiling for the market. If obicetrapib can demonstrate similar MACE reduction with oral convenience, it can potentially substitute value from this ~$6.3 billion pool by 2035.4 The growth of bempedoic acid (10.5% CAGR in secondary research estimates) further validates the market’s willingness to pay for branded oral non-statins.1
+5.3. Practical TAM by Geography and Segment
+Germany represents the largest geographic revenue pool, accounting for US$1.65 billion in 2025 practical TAM.1 From a patient segment perspective, the ASCVD uncontrolled pool is the highest-value segment, representing 46% of the territory's treatment revenue.1
+TABLE 8: Menarini Territory Practical TAM by Patient Segment ($Mn)
+
+Patient Segment
+2025
+2030
+2035
+Interpretation
+ASCVD / High-Risk
+4,146.9
+4,896.1
+5,781.4
+Priority intensification segment 1
+Hypercholesterolemia
+2,524.2
+2,980.2
+3,519.1
+Main label-relevant pool 1
+HeFH
+1,262.1
+1,490.1
+1,759.6
+High-unmet need specialty group 1
+Mixed Dyslipidemia
+811.4
+957.9
+1,131.2
+Adjacent label-expansion pool 1
+Statin Intolerant
+270.5
+319.3
+377.1
+Critical oral non-statin niche 1
+
+Demand is driven by the tightening of ESC/EAS guidelines, which favor earlier combination therapy to reach target LDL-C levels below 1.8 mmol/L and 1.4 mmol/L.8 This clinical trend supports the positioning of the obicetrapib/ezetimibe FDC as an early escalation option.16
+## 6. Unmet Need, LDL-C Control Gap & SAM Conversion
+6.1. The LDL-C Control Gap in Europe
+Despite the availability of generic and branded therapies, LDL-C goal attainment remains suboptimal across Europe. Data from the DA VINCI study indicate that only 31.1% of high and very-high risk patients achieve risk-based targets.4 This non-attainment is driven by:
+Statin Resistance and Intolerance: Approximately 10% of high-risk patients are statin-intolerant or require non-statin add-ons to reach goal.1
+Injection Burden: A significant portion of the patient and prescriber base is resistant to self-injection or the cold-chain logistics required for PCSK9 monoclonal antibodies.3
+Treatment Intensification Gaps: Clinical inertia often prevents the escalation to high-efficacy therapies, creating a pool of "undertreated" high-risk individuals.7
+6.2. SAM Conversion Logic
+The SAM represents the addressable "commercial ceiling" after filtering the theoretical patient pool by expected labeling and payer access hurdles. The model converts the uncontrolled LDL-C pool into SAM based on a base eligibility factor (0.82) and a reachability factor (1.0) in the base case.1
+TABLE 9: TAM-to-SAM Revenue Potential Bridge ($Mn, 2035)
+
+Step
+Pool / Revenue
+Conversion
+Output
+Rationale
+Practical TAM
+$12,568.4
+N/A
+$12,568.4
+Total territory relevant LLT pool 1
+Uncontrolled Filter
+$12,568.4
+42.1%
+$5,291.3
+Targets only those failing goals 1
+Label / Access
+$5,291.3
+82.0%
+$4,338.9
+Filtered for label and HTA 1
+SAM Potential
+$6,709.2
+Formula-derived
+$6,709.2
+Calculated pre-adoption ceiling 1
+
+Analysis indicates that the SAM Potential is not the actual revenue, but the pre-adoption revenue ceiling. Revenue only begins to flow once country launch flags are activated, ensuring consistency with the model’s "zero revenue pre-approval" rule.1
+6.3. Label Eligibility by Segment
+The breadth of the approved label will be the single most important variable for early SAM activation. The model segments eligibility based on clinical risk categories.
+HeFH (Base 0.75 Factor): High priority specialist segment with the strongest medical evidence for reimbursement.1
+ASCVD (Base 0.55 Factor): The largest intensification pool, but subject to stricter payer filters until CV outcomes data is fully integrated.1
+Statin-Intolerant (Base 0.60 Factor): Oral non-statin positioning supports a higher eligibility factor in this niche.1
+## 7. Obicetrapib Clinical Evidence & Pipeline Positioning
+7.1. Obicetrapib Asset Profile
+Obicetrapib is a next-generation CETP inhibitor developed to overcome the potency and safety limitations of earlier class assets. Clinical evidence from Phase 2 and 3 programs demonstrates that obicetrapib, both as monotherapy and in combination with ezetimibe, achieves biologic-like LDL-C reduction through an oral mechanism.4
+TABLE 10: Obicetrapib Pivotal Trial Evidence Summary
+
+Trial
+Phase
+Population
+Result
+Commercial Implication
+BROADWAY
+Phase 3
+ASCVD / HeFH
+~35% LDL-C reduction
+Supports base lipid label 2
+BROOKLYN
+Phase 3
+HeFH
+36.3% reduction (adj.)
+Specialist segment validator 1
+TANDEM
+Phase 3
+High-risk/ASCVD
+48.6% LS mean reduction
+Driver for FDC positioning 1
+ROSE2
+Phase 2
+LLT-treated
+59% Median reduction
+Benchmarks efficacy vs biologics 9
+PREVAIL
+Phase 3
+ASCVD / High-risk
+Ongoing (9,500 pts)
+Long-term adoption accelerator 1
+
+7.2. Safety and Differentiation
+Historical CETP class concerns focused on off-target hypertensive effects (torcetrapib) and lack of potency in broad populations (dalcetrapib).1 Analysis indicates that obicetrapib maintains a safety profile comparable to placebo, with no observed impact on blood pressure.4 This differentiation is critical for securing clinical confidence. Furthermore, obicetrapib’s high selectivity for CETP over other lipid-transfer proteins reduces the risk of non-specific lipid changes.3
+7.3. Pipeline and Expansion Potential
+The RUBENS program, initiated in December 2025, evaluates obicetrapib in type 2 diabetes and metabolic syndrome, populations that require aggressive lipid lowering but often face barriers to intensification.5 Success in RUBENS could expand the SAM in the post-2030 period. Additionally, exploratory analyses from the BROADWAY trial indicate a potential link between CETP inhibition and neurodegeneration biomarkers (p-tau217), presenting a long-term "narrative optionality" in Alzheimer’s disease that is not currently included in the core lipid market sizing.1
+## 8. Regulatory Pathway, Label Scenarios & Launch Timing
+8.1. Regulatory Submission and Status
+In August 2025, the EMA validated the Marketing Authorisation Applications (MAAs) for both obicetrapib monotherapy and the obicetrapib/ezetimibe FDC.2 Parallel submissions were accepted by the MHRA (UK) and Swissmedic.5 Approval decisions are anticipated in the second half of 2026, positioning 2027 as the first full commercial revenue year.5
+8.2. Country Launch Waves and Activation
+Launch activation is staggered across the Menarini territory based on country-specific reimbursement pathways and HTA evidence requirements.
+TABLE 11: Menarini Territory Launch Sequencing & Access Logic
+
+Country
+Reimbursement
+Launch Wave
+Access Pathway Logic
+Access Risk
+Germany
+2027
+Wave 1
+AMNOG early reimbursed launch
+Moderate 1
+United Kingdom
+2027
+Wave 1
+NICE cost-effectiveness hurdle
+High 1
+France
+2028
+Wave 2
+HAS/CEPS price-volume control
+Moderate 1
+Switzerland
+2028
+Wave 2
+Premium market specialty access
+Low 1
+Italy
+2028
+Wave 2
+Regional implementation variation
+High 1
+Spain
+2028
+Wave 2
+Budget pressure/regional delays
+High 1
+
+The model assumes that revenue starts strictly from the reimbursement year. Germany and the UK are prioritized due to their established infrastructure for specialist-led early access. WAVE 2 countries follow once national pricing negotiations are finalized.1
+8.3. The Influence of Cardiovascular Outcomes Data
+The adoption ramp follows a standard pharmaceutical S-curve, reaching peak penetration approximately 8 years after launch.1 However, the readout of the PREVAIL CVOT trial serves as a critical strategic milestone. Analysis indicates that positive cardiovascular benefit results could transform obicetrapib from a "specialist add-on" to a "standard intensification" therapy, materially increasing adoption rates in the 2031–2035 period.1
+## 9. Pricing, Reimbursement & Monetization Architecture ($/Patient/Year)
+9.1. Pricing Methodology for Pre-Approval Asset
+Obicetrapib is priced as a premium branded oral therapy. Analysis indicates that the pricing strategy must navigate the space between low-cost generic ezetimibe and high-cost injectable biologics. The "mid-branded" pricing tier is anchored to bempedoic acid (Nustendi/Nilemdo), which serves as the closest oral benchmark.1
+TABLE 12: Country Net Pricing and Gross-to-Net (GTN) Assumptions
+
+Country
+Mono Net Price
+FDC Net Price
+GTN Factor
+Pricing Rationale
+Germany
+$1,050
+$1,312.5
+0.72
+AMNOG mid-branded benchmark 1
+Switzerland
+$1,200
+$1,500.0
+0.75
+Premium market capability 1
+France
+$900
+$1,125.0
+0.68
+HAS/CEPS mid-tier proxy 1
+United Kingdom
+$875
+$1,093.8
+0.70
+NICE cost-effectiveness floor 1
+Italy
+$850
+$1,062.5
+0.66
+Regional implementation pressure 1
+Spain
+$800
+$1,000.0
+0.65
+Budget-conscious benchmark 1
+
+FDC Premium: The FDC includes a 25% price premium over monotherapy, justified by the dual-mechanism efficacy and improved patient adherence.1
+9.2. Monetization Formula and Revenue Per Patient
+The monetization model accounts for annual price erosion to avoid unrealistic long-term revenue projections. Erosion factors range from 1.2% in core markets to 1.8% in the "Rest of Europe," reflecting standard HTA price reviews and generic entry in adjacent lipid classes.1
+Gross-to-Net Adjustments: GTN factors between 25% and 38% reflect the impact of statutory rebates and national/regional negotiated discounts.1
+Blended Monetization: As the product mix shifts from monotherapy to FDC (projected 61.9% share by 2035), the blended net revenue per patient is expected to rise despite mono price erosion.1
+9.3. HTA Evidence and Payer Requirements
+Payer access will depend on the demonstration of incremental benefit over generic ezetimibe and branded bempedoic acid. NICE (UK) and HAS (France) are expected to scrutinize the TANDEM trial data, which achieved a 48.6% LDL-C reduction—significantly higher than the ~18% reduction typically associated with bempedoic acid.12 Proactive health-economic modeling is required to position the FDC as a "pre-injectable" step that avoids the higher budgetary burden of PCSK9/inclisiran therapies.1
+## 10. Market Size & Forecast, 2025–2035 ($Mn, Patients, %)
+10.1. Forecast Methodology
+The forecast methodology utilizes a bottom-up patient demand engine.1 Addressable SAM patients are converted into treated SOM patients based on a gradual adoption ramp (0.5% Year 0 to 9.5% at peak) to reflect the medical education requirements for a revived class.1 Revenue is calculated as treated patients multiplied by the blended net annual price of obicetrapib mono and FDC.1
+10.2. Market Layer Forecast ($Mn)
+The market demonstrates a rapid category-creation ramp following the 2027 launch wave. While the underlying lipid TAM remains stable, the CETP category builds from zero to a significant specialty market.
+TABLE 13: TAM / SAM / SOM Bridge Forecast ($Mn)
+Market Layer
+2025
+2027
+2030
+2035
+CAGR / Note
+Global Practical TAM
+31,800.0
+34,262.7
+38,319.0
+46,174.3
+3.8% (2025–35)
+Menarini Territory TAM
+9,015.0
+9,634.0
+10,643.6
+12,568.4
+3.4% (2025–35)
+CETP SAM Potential
+0.0
+1,933.6
+6,688.9
+6,709.2
+Pre-adoption ceiling
+Menarini SOM Revenue
+0.0
+10.8
+181.7
+468.1
+Launch-driven ramp
+
+Insight: The Menarini SOM represents approximately 7% of the SAM Potential by 2035, indicating massive headroom for growth if adoption multipliers are triggered by positive PREVAIL outcomes data.1
+10.3. Product and Patient Segment Forecast
+The transition to FDC-led commercialization is a key structural shift in the forecast.
+TABLE 14: Menarini SOM Forecast by Product and Segment ($Mn)
+
+Category
+2027
+2030
+2035
+2035 Share
+Obicetrapib Mono
+10.8
+120.3
+178.4
+38.1% 1
+Obicetrapib FDC
+0.0
+61.4
+289.7
+61.9% 1
+ASCVD High-Risk Segment
+5.0
+83.6
+215.3
+46.0% 1
+Primary Hyperchol. Seg.
+3.0
+50.9
+131.1
+28.0% 1
+HeFH Segment
+1.5
+25.4
+65.5
+14.0% 1
+
+Demand is driven by the ASCVD and primary hypercholesterolemia pools, which together account for 74% of the total revenue.1 The HeFH segment, while smaller in volume, serves as a high-margin entry point for specialist-led early adoption.1
+## 11. Europe, UK & Switzerland Opportunity Analysis
+11.1. Menarini Rights and Geographic Priorities
+Menarini holds exclusive rights across Europe, the UK, and Switzerland.7 The territory accounts for 28.3% of the global practical lipid TAM in 2025, but this share is expected to moderate to 19.5% by 2035 as non-rights markets (US/Asia) experience faster therapy intensification.1
+TABLE 15: 2035 Country Opportunity Ranking for Menarini
+
+Country
+2035 SOM Revenue
+2035 Share
+Access Readiness
+Launch Priority
+Germany
+$142.2 Mn
+30.4%
+High (AMNOG)
+1 (Priority) 1
+France
+$76.4 Mn
+16.3%
+Moderate (HAS)
+2 (Priority) 1
+United Kingdom
+$72.2 Mn
+15.4%
+High (NICE)
+2 (Priority) 1
+Italy
+$52.5 Mn
+11.2%
+Low (Regional)
+3 (Selective) 1
+Spain
+$32.6 Mn
+7.0%
+Low (Budget)
+3 (Selective) 1
+Switzerland
+$17.4 Mn
+3.7%
+High (Premium)
+2 (Priority) 1
+Rest of Europe
+$74.8 Mn
+16.0%
+Variable
+3 (Selective) 1
+
+Germany and the UK drive early value due to their 2027 reimbursement activation.1 France and Switzerland contribute significantly to mid-term growth, with Switzerland offering the highest net price potential ($1,200/yr) albeit with a smaller volume.1
+11.2. Strategic Interpretation for Menarini
+Analysis indicates that commercial success is contingent on a two-pronged strategy:
+Wave 1 Intensity (2027): Focus resources on Germany and the UK to establish a foothold in the HeFH and high-risk ASCVD specialist markets.1
+Wave 2 Expansion (2028–2030): Leverage initial success and broader lipid goal non-attainment data to secure reimbursement in France, Italy, and Spain.1 Proactive management of regional Implementation in Italy and Spain is required to avoid adoption bottlenecks.1
+## 12. Competitive Landscape & Substitute Therapy Pressure
+12.1. Direct vs. Indirect Competition
+Direct competition within the CETP class is non-existent for the current forecast period, providing obicetrapib with a first-mover advantage.1 However, indirect competition from other lipid-lowering classes is the primary determinant of adoption ceilings.
+TABLE 16: Therapy Competitive Positioning Matrix
+
+Therapy / Product
+Route
+Efficacy
+Price Tier
+Access Burden
+Threat Level
+Statins / Ezetimibe
+Oral
+Standard
+Low
+Very Low
+Baseline Ceiling 1
+Bempedoic Acid
+Oral
+~18% LDL
+Mid
+Moderate
+Direct Oral Rival 1
+PCSK9 mAbs
+Injectable
+~60% LDL
+High
+High
+Substitution Substitute 1
+Inclisiran
+Injectable
+~50% LDL
+High
+High
+Long-acting Substitute 1
+Obicetrapib FDC
+Oral FDC
+~49% LDL
+Mid-Branded
+Moderate
+Client Asset 18
+
+12.2. Positioning Against Substitute Therapies
+Obicetrapib’s success depends on carving out a space between generic add-ons and expensive biologics.
+Convenience Advantage: Analysis indicates that oral small molecules avoid the "injection barrier" and cold-chain logistics of biologics.3
+Efficacy vs. Bempedoic Acid: Obicetrapib (35%–49% reduction) significantly outperforms bempedoic acid (~18%), providing a clear efficacy narrative for HTA dossiers.12
+Access Differentiator: Position the FDC as a "biologic-like" oral step that provides near-PCSK9 levels of LDL-C lowering at a lower budgetary impact to payers.1
+12.3. Emerging and Future Threats
+Long-term threats include the maturation of Lp(a) therapies and RNA-based treatments for ANGPTL3 and apoC-III.1 While these target different lipid pathways, they compete for the same high-risk cardiovascular patients and specialist budget allocations. Menarini should monitor these developments but prioritize obicetrapib’s established oral-add-on positioning in the near-term.1
+## 13. Adoption Dynamics, Access Readiness & Market Conversion
+13.1. Converting Approval to Guideline Confidence
+The conversion from regulatory approval to routine prescribing requires a transition through four stages of readiness.
+TABLE 17: Adoption Readiness Scorecard by Country
+
+Country
+Disease Burden
+Pricing Potential
+Specialist Readiness
+Overall Readiness
+Germany
+5.0
+4.0
+4.0
+4.35 (High) 1
+United Kingdom
+4.0
+3.0
+4.0
+3.65 (Medium) 1
+France
+4.0
+3.0
+4.0
+3.65 (Medium) 1
+Switzerland
+2.0
+5.0
+4.0
+3.65 (Medium) 1
+Italy
+4.0
+3.0
+3.0
+3.35 (Low-Med) 1
+Spain
+3.0
+3.0
+3.0
+3.00 (Low) 1
+
+13.2. Specialist and Payer Barriers
+Adoption is initially restricted to cardiologists and lipidologists due to the historical CETP skepticism.1 Primary care adoption is expected only after obicetrapib is incorporated into broad clinical guidelines (ESC/EAS) and proves its safety in a real-world setting.1 Payer barriers include step-therapy requirements—where patients may be forced to fail ezetimibe or bempedoic acid—and restrictive HTA criteria for ASCVD patients without HeFH.1
+13.3. Adoption Ramp and Mix Dynamics
+The adoption ramp follows a steady progression. Analysis indicates that Year 0 launch year penetration is a conservative 0.5% of SAM, growing to 6.5% by Year 5 and 9.5% by the end of the forecast period.1 The product mix is expected to flip in 2033, with the FDC becoming the dominant revenue driver as payers and physicians prioritize dual-mechanism simplification.1
+## 14. Menarini Opportunity, Value Capture & Strategic Positioning
+14.1. Menarini SOM and Gross Profit Proxy
+The Menarini-capturable opportunity is estimated to grow to a US374.5 million (approximately 80% margin proxy) by 2035.1
+TABLE 18: Menarini Strategic Positioning & Levers
+
+Opportunity Area
+Menarini Position
+Strategic Lever
+Priority
+HTA Access
+Reimbursed Launch
+Payer Dossier Development
+High 1
+KOL Activation
+Specialist Trust
+Medical Education / PREVAIL
+High 1
+FDC Value
+Blended Mon.
+Differentiation vs Ezetimibe
+High 1
+Wave 1 Markets
+Germany / UK
+Early Investment Sequencing
+High 1
+Expansion Pool
+ASCVD Adoption
+Real-World Evidence Plan
+Medium 1
+
+14.2. Strategy for Value Capture
+Menarini’s strategy centers on positioning obicetrapib as the "Oral Biologic" equivalent.
+Specialist Reach: Leverage existing cardiovascular capabilities to target the ~4.4 million reachable high-risk patients.1
+HTA Dossiers: Use the TANDEM data to secure early AMNOG and NICE approvals. Emphasize the potential for obicetrapib to reduce the overall "budget impact" by delaying the need for higher-cost injectables.1
+Medical Education: Proactively address the CETP class skepticism by leading with selectivity and potency data.1
+## 15. Scenario Analysis & Forecast Sensitivities
+15.1. Forecast Scenarios (Downside, Base, Upside)
+The forecast is subject to significant uncertainty regarding regulatory labeling and HTA acceptance.
+TABLE 19: Market Revenue Scenario Output ($Mn)
+
+Scenario
+2030 SOM
+2035 SOM
+Strategic Meaning
+Downside
+$181.7
+$468.1
+Narrow label / Access restricted 1
+Base
+$417.5
+$1,075.3
+Expected launch and adoption 1
+Upside
+$0.0*
+$0.0*
+Outcomes-supported acceleration
+
+Note: Base revenue of $417.5M in 2030 represents the standard launch path, while the Downside case accounts for 1-year delays and price pressure.1
+15.2. Key Sensitivity Drivers
+Revenue is most sensitive to the label eligibility multiplier and adoption rates.
+TABLE 20: 2035 SOM Sensitivity Analysis ($Mn)
+
+Variable
+Downside Impact
+Upside Impact
+Strategic Interpretation
+Label Breadth
+-US$163.8
++US$117.0
+Priority pre-launch variable 1
+Adoption Rate
+-US$140.4
++US$140.4
+Trust-dependent ramp 1
+Net Price
+-US$140.4
++US$140.4
+HTA negotiation dependent 1
+Access Filter
+-US$117.0
++US$84.3
+Wave 2 timing critical 1
+FDC Mix
+-US$46.8
++US$56.2
+Mix shift impacts blended price 1
+
+Interpretation: A narrow high-risk label would reduce the potential territory revenue by over 35%, emphasizing the need for a broad label strategy at EMA.1 Conversely, positive outcomes results could expand the multiplier by 45%.1
+## 16. Risk Assessment & Mitigation Framework
+16.1. Regulatory and Access Risks
+The primary threat to the Menarini SOM is a restrictive reimbursement environment or delay in regulatory decisions.
+TABLE 21: Market Risk Matrix and Mitigation Priority
+
+Risk
+Severity
+Prob.
+Market Impact
+Mitigation Priority
+Narrow Label
+High
+Med
+Reduces SAM by 40%
+High (HTA Dossier) 1
+Class Skepticism
+High
+Med
+Slows Adoption Ramp
+High (Med Ed) 1
+Injectable Sub.
+Med
+High
+Caps High-risk share
+Med (Oral Positioning) 1
+FDC Delay
+Med
+Low
+Blended Price Drop
+Med (MAA Strategy) 1
+Price Pressure
+Med
+High
+Revenue per pt drop
+High (HTA Evidence) 1
+
+The most immediate priority is differentiating obicetrapib safety to address the historical failures. Menarini must proactively manage the "legacy CETP" narrative in cardiologist peer groups.1
+## 17. Strategic Roadmap & Future Outlook, 2025–2035
+17.1. Launch Preparation and Wave 1 Execution (2025–2027)
+Analysis indicates the focus must be on 2H 2026 approval and 2027 Wave 1 launch in Germany, the UK, and Switzerland.5 Menarini must finalize its HTA dossier, highlighting the 48.6% LDL-C reduction in the TANDEM trial to justify its premium oral status.18
+17.2. Scaling and Guideline Integration (2028–2030)
+The mid-period focus shifts to securing reimbursement in Wave 2 markets (France, Italy, Spain) and scaling the FDC product mix to ~29% of total patients.1 Success depends on moving obicetrapib from a "specialist curios" to a "standard escalation option" for patients above targets.1
+17.3. Outcomes Maturity and Broad Adoption (2031–2035)
+Post-PREVAIL data, the commercial narrative will transition from LDL-C lowering to MACE reduction benefit. This phase is characterized by the potential expansion into broader cardiometabolic populations and the maturation of the FDC as the territory’s dominant oral intensification therapy, reaching a US$468.1 million revenue maturity.1
+## 18. Appendix
+18.1. Calculation Logic and Assumptions
+TAM Formula: Σ (Country Practical TAM) = Σ (Current Relevant LLT Revenue Pools).1
+SAM Patients Formula: (Adult Pop. × Hyperchol. Prev. × Uncontrolled LDL-C rate) × (Label Eligibility Factor × Reachability Factor).1
+Monetization Formula: (Treated Patients × Mono Mix × Mono Net Price) + (Treated Patients × FDC Mix × FDC Net Price).1
+Price Erosion: A standard -1.2% CAGR applied to annual net prices across core territories.1
+Adoption Ramp: Year 0: 0.005; Year 5: 0.065; Year 8: 0.095.1
+18.2. Source Registry (Top Tranche)
+2: Regulatory status and EMA submission details.
+1: Model patient funnel and epidemiology benchmarks.
+1: Pricing engine and annual forecast outputs.
+1: Menarini territory analysis and scenario dashboard.
+1: Workbook extractions for clinical evidence and strategy.
+18.3. Glossary of Terms
+ASCVD: Atherosclerotic Cardiovascular Disease.
+CETP: Cholesteryl Ester Transfer Protein.
+FDC: Fixed-Dose Combination.
+HeFH: Heterozygous Familial Hypercholesterolemia.
+HTA: Health Technology Assessment.
+MACE: Major Adverse Cardiovascular Events.
+SOM: Serviceable Obtainable Market (Menarini capture).
+Final Strategic Outlook: Analysis indicates that the CETP category revival through obicetrapib offers Menarini a sustainable, high-value specialty revenue stream. By leveraging the superior potency of the FDC, prioritizing the German and UK launch waves, and rebuilding specialist trust through evidence-based outcomes positioning, Menarini can establish itself as the dominant leader in the next generation of oral lipid-lowering therapies.1
 """
 
 
-# -----------------------------------------------------------------------------
-# REPORT PARSING AND SECTION HELPER
-# -----------------------------------------------------------------------------
+# =============================================================================
+# MASKING LOGIC
+# =============================================================================
+def mask_sensitive_numbers(text: str) -> str:
+    year_tokens = {}
+    def protect_year(match):
+        token = f"__YEAR_{len(year_tokens)}__"
+        year_tokens[token] = match.group(0)
+        return token
+
+    protected = re.sub(r"\b20\d{2}\b", protect_year, text)
+
+    protected = re.sub(r"US\$?\s?\d[\d,\.]*\s?(Mn|million|billion|B|M)?", "US$ [Proprietary]", protected, flags=re.I)
+    protected = re.sub(r"\$\s?\d[\d,\.]*\s?(Mn|million|billion|B|M)?", "$ [Proprietary]", protected, flags=re.I)
+    protected = re.sub(r"\b\d[\d,\.]*\s?%", "[Proprietary]%", protected)
+    protected = re.sub(r"\b\d[\d,\.]*\s?(million|billion|Mn|patients|pts|patient|yr|year|CAGR)\b", "[Proprietary] \\1", protected, flags=re.I)
+    protected = re.sub(r"\b\d{1,3}(?:,\d{3})+(?:\.\d+)?\b", "[Proprietary]", protected)
+    protected = re.sub(r"(?<!Phase\s)(?<!Wave\s)(?<!TABLE\s)(?<!Table\s)\b\d+\.\d+\b", "[Proprietary]", protected)
+
+    for token, year in year_tokens.items():
+        protected = protected.replace(token, year)
+
+    return protected
+
+
 def parse_report_sections(text: str) -> dict:
-    """
-    Parse the report into a dictionary keyed by section headers.  It
-    interprets lines beginning with double hash (##) as section titles
-    and collects subsequent lines until the next header.  All content is
-    masked on the fly to protect sensitive numbers.
-
-    Parameters
-    ----------
-    text : str
-        Raw report text including all headings.
-
-    Returns
-    -------
-    dict
-        Dictionary mapping section title to list of paragraphs.
-    """
-    lines = text.strip().split("\n")
     sections = {}
-    current_header = "Introduction"
-    current_content = []
-    for line in lines:
+    current_header = "Cover / Report Title"
+    current_lines = []
+
+    for line in text.strip().splitlines():
         if line.startswith("## "):
-            # save previous
-            sections[current_header] = current_content
-            current_header = line[3:].strip()
-            current_content = []
+            sections[current_header] = "\n".join(current_lines).strip()
+            current_header = line.replace("## ", "").strip()
+            current_lines = []
         else:
-            # mask sensitive numbers
-            current_content.append(mask_sensitive_numbers(line))
-    # store final
-    sections[current_header] = current_content
+            current_lines.append(line)
+
+    sections[current_header] = "\n".join(current_lines).strip()
     return sections
 
 
-report_sections = parse_report_sections(REPORT_TEXT)
+def format_report_text(text: str) -> str:
+    masked = mask_sensitive_numbers(text)
+    escaped = html.escape(masked)
+    escaped = escaped.replace("\n", "<br>")
+    return escaped
 
 
-# -----------------------------------------------------------------------------
-# CUSTOM CSS FOR STYLING
-# -----------------------------------------------------------------------------
-def inject_custom_css():
-    css = f"""
-    <style>
-        /* Background and card styling */
-        body {{
-            background-color: {LIGHT_GREY};
+REPORT_SECTIONS = parse_report_sections(REPORT_TEXT)
+
+
+# =============================================================================
+# CSS
+# =============================================================================
+def inject_css():
+    st.markdown(
+        f"""
+        <style>
+        html, body, [class*="css"] {{
+            font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         }}
+
         .stApp {{
-            background-color: {LIGHT_GREY};
-        }}
-        .main .block-container {{
-            padding-top: 1rem;
-            padding-left: 2rem;
-            padding-right: 2rem;
-        }}
-        .sidebar .sidebar-content {{
-            background-color: {BURGUNDY_DARK};
-        }}
-        /* Title styling */
-        .title-text {{
-            font-size: 32px;
-            font-weight: 700;
-            color: {WHITE};
-        }}
-        .subtitle-text {{
-            font-size: 18px;
-            font-weight: 400;
-            color: {SOFT_ROSE};
-        }}
-        /* Footer styling */
-        .footer {{
-            font-size: 12px;
-            color: {MUTED_TEXT};
-            text-align: center;
-            padding: 10px 0;
-        }}
-        /* Login card */
-        .login-card {{
-            background-color: {WHITE};
-            padding: 2rem;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            max-width: 400px;
-            margin: 0 auto;
-        }}
-        .login-header {{
-            color: {BURGUNDY};
-            font-weight: 700;
-            margin-bottom: 1rem;
-            text-align: center;
-        }}
-        .login-label {{
-            margin-bottom: 0.25rem;
-            color: {DARK_TEXT};
-            font-weight: 500;
-        }}
-        .login-input input {{
-            border: 1px solid {BORDER_GREY};
-            border-radius: 4px;
-        }}
-        .login-button button {{
-            background-color: {BURGUNDY};
-            color: {WHITE};
-            border: none;
-            border-radius: 4px;
-            padding: 0.5rem 1rem;
-            width: 100%;
-        }}
-        .login-button button:hover {{
-            background-color: {MID_BURGUNDY};
-            color: {WHITE};
-        }}
-        /* KPI card styling */
-        .kpi-card {{
-            background-color: {WHITE};
-            border-radius: 8px;
-            padding: 1rem 1.5rem;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            position: relative;
-        }}
-        .kpi-title {{
-            color: {MUTED_TEXT};
-            font-size: 12px;
-            text-transform: uppercase;
-            margin-bottom: 0.5rem;
-        }}
-        .kpi-value {{
-            color: {BURGUNDY};
-            font-size: 28px;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-        }}
-        .kpi-subtitle {{
-            color: {MUTED_TEXT};
-            font-size: 12px;
-        }}
-        /* Section header */
-        .section-header {{
-            font-size: 22px;
-            font-weight: 600;
-            color: {BURGUNDY_DARK};
-            margin-top: 2rem;
-            margin-bottom: 1rem;
-        }}
-        /* Divider line */
-        .divider {{
-            height: 1px;
-            background-color: {BORDER_GREY};
-            margin: 1rem 0;
-        }}
-        /* Table styling */
-        .table-wrapper {{
-            overflow-x: auto;
-        }}
-        .styled-table {{
-            border-collapse: collapse;
-            width: 100%;
-        }}
-        .styled-table thead {{
-            background-color: {BURGUNDY};
-        }}
-        .styled-table th {{
-            color: {WHITE};
-            padding: 0.5rem 0.75rem;
-            text-align: left;
-            font-weight: 600;
-            font-size: 14px;
-        }}
-        .styled-table td {{
-            padding: 0.5rem 0.75rem;
-            color: {DARK_TEXT};
-            font-size: 14px;
-            border-bottom: 1px solid {BORDER_GREY};
-        }}
-        .styled-table tr:nth-child(even) {{
-            background-color: {LIGHT_GREY};
-        }}
-        /* Expander styling */
-        .stExpander > summary {{
-            background-color: {WHITE};
-            border-radius: 4px;
-            padding: 0.5rem;
-            border: 1px solid {BORDER_GREY};
-        }}
-        .stExpander > summary:hover {{
-            background-color: {SOFT_ROSE};
+            background: {LIGHT_GREY};
             color: {DARK_TEXT};
         }}
-        /* Chart container */
-        .chart-container {{
-            border-radius: 8px;
-            background-color: {WHITE};
-            padding: 1rem;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            margin-bottom: 1rem;
+
+        [data-testid="stHeader"] {{
+            background: rgba(244,245,247,0.7);
         }}
-        /* Footer fixed */
+
         footer {{
             visibility: hidden;
         }}
-    </style>
-    """
-    st.markdown(css, unsafe_allow_html=True)
 
+        .block-container {{
+            padding-top: 1.2rem;
+            padding-bottom: 1rem;
+            max-width: 1380px;
+        }}
 
-# -----------------------------------------------------------------------------
-# LOGIN FUNCTIONALITY
-# -----------------------------------------------------------------------------
-USERNAME = "SMR"
-PASSWORD = "SMR@2026"
+        section[data-testid="stSidebar"] {{
+            background: linear-gradient(180deg, {BURGUNDY_DARK} 0%, {BURGUNDY} 100%);
+        }}
 
+        section[data-testid="stSidebar"] * {{
+            color: white;
+        }}
 
-def login():
-    """
-    Render the login form and authenticate the user.  On success, return True.
-    Otherwise return False.  Credentials are hardcoded for demonstration.
-    """
-    st.markdown(
-        f"<div class='login-card'>"
-        f"<div class='login-header'>Strategic Market Research</div>"
-        f"<div class='login-subheader'>Confidential Sample Report Preview</div>",
+        .hero {{
+            background: linear-gradient(135deg, {BURGUNDY_DARK} 0%, {BURGUNDY} 45%, {MID_BURGUNDY} 100%);
+            color: white;
+            padding: 48px;
+            border-radius: 28px;
+            border: 1px solid rgba(255,255,255,0.10);
+            box-shadow: 0 20px 55px rgba(58,7,28,0.22);
+            margin-bottom: 24px;
+        }}
+
+        .hero-kicker {{
+            display: inline-block;
+            background: rgba(201,162,39,0.18);
+            color: {GOLD};
+            border: 1px solid rgba(201,162,39,0.45);
+            padding: 6px 12px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-bottom: 18px;
+        }}
+
+        .hero h1 {{
+            font-size: 42px;
+            line-height: 1.08;
+            font-weight: 850;
+            margin: 0 0 14px 0;
+            letter-spacing: -0.03em;
+        }}
+
+        .hero h2 {{
+            color: {SOFT_ROSE};
+            font-size: 19px;
+            font-weight: 500;
+            margin: 0 0 22px 0;
+            max-width: 980px;
+        }}
+
+        .hero p {{
+            max-width: 930px;
+            font-size: 15px;
+            line-height: 1.7;
+            color: rgba(255,255,255,0.88);
+        }}
+
+        .kpi-grid {{
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 16px;
+            margin: 18px 0 28px 0;
+        }}
+
+        .kpi-card {{
+            background: {WHITE};
+            border: 1px solid {BORDER_GREY};
+            border-radius: 18px;
+            padding: 20px;
+            min-height: 132px;
+            box-shadow: 0 10px 30px rgba(43,43,43,0.045);
+        }}
+
+        .kpi-label {{
+            color: {MUTED_TEXT};
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }}
+
+        .kpi-value {{
+            color: {BURGUNDY};
+            font-size: 25px;
+            line-height: 1.15;
+            font-weight: 850;
+            margin-bottom: 10px;
+        }}
+
+        .kpi-note {{
+            color: {MUTED_TEXT};
+            font-size: 13px;
+            line-height: 1.45;
+        }}
+
+        .section-card {{
+            background: {WHITE};
+            border: 1px solid {BORDER_GREY};
+            border-radius: 22px;
+            padding: 26px 28px;
+            box-shadow: 0 10px 34px rgba(43,43,43,0.045);
+            margin-bottom: 22px;
+        }}
+
+        .section-title {{
+            color: {BURGUNDY_DARK};
+            font-size: 25px;
+            font-weight: 850;
+            letter-spacing: -0.02em;
+            margin: 0 0 12px 0;
+        }}
+
+        .section-subtitle {{
+            color: {MUTED_TEXT};
+            font-size: 14px;
+            line-height: 1.65;
+            margin-bottom: 20px;
+        }}
+
+        .text-panel {{
+            background: #FBFBFC;
+            border: 1px solid {BORDER_GREY};
+            border-left: 5px solid {BURGUNDY};
+            border-radius: 16px;
+            padding: 18px 20px;
+            line-height: 1.68;
+            color: {DARK_TEXT};
+            font-size: 14.5px;
+            margin: 14px 0;
+        }}
+
+        .insight-box {{
+            background: linear-gradient(135deg, #FFF9EA 0%, #FFFFFF 100%);
+            border: 1px solid rgba(201,162,39,0.35);
+            border-left: 6px solid {GOLD};
+            border-radius: 18px;
+            padding: 18px 20px;
+            color: {DARK_TEXT};
+            margin: 18px 0;
+            box-shadow: 0 8px 28px rgba(201,162,39,0.08);
+        }}
+
+        .closing-panel {{
+            background: linear-gradient(135deg, {BURGUNDY_DARK} 0%, {BURGUNDY} 100%);
+            color: white;
+            border-radius: 24px;
+            padding: 34px 36px;
+            box-shadow: 0 20px 55px rgba(58,7,28,0.24);
+            margin-top: 18px;
+        }}
+
+        .closing-panel h2 {{
+            color: white;
+            margin-top: 0;
+            font-size: 30px;
+            line-height: 1.2;
+        }}
+
+        .closing-panel p, .closing-panel li {{
+            color: rgba(255,255,255,0.88);
+            line-height: 1.7;
+            font-size: 15px;
+        }}
+
+        .chart-card {{
+            background: {WHITE};
+            border: 1px solid {BORDER_GREY};
+            border-radius: 22px;
+            padding: 22px;
+            margin: 18px 0 24px 0;
+            box-shadow: 0 10px 34px rgba(43,43,43,0.045);
+        }}
+
+        .chart-title {{
+            font-size: 18px;
+            font-weight: 850;
+            color: {BURGUNDY};
+            margin-bottom: 6px;
+        }}
+
+        .chart-caption {{
+            font-size: 13px;
+            color: {MUTED_TEXT};
+            line-height: 1.55;
+            margin-bottom: 18px;
+        }}
+
+        .funnel-row {{
+            height: 46px;
+            border-radius: 12px;
+            margin: 10px auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 18px;
+            color: white;
+            font-weight: 750;
+            box-shadow: 0 8px 20px rgba(58,7,28,0.10);
+        }}
+
+        .matrix {{
+            position: relative;
+            height: 470px;
+            background:
+                linear-gradient(to right, transparent 49.8%, rgba(91,14,45,0.14) 50%, transparent 50.2%),
+                linear-gradient(to bottom, transparent 49.8%, rgba(91,14,45,0.14) 50%, transparent 50.2%),
+                #FFFFFF;
+            border: 1px solid {BORDER_GREY};
+            border-radius: 18px;
+            overflow: hidden;
+        }}
+
+        .axis-label-x {{
+            position: absolute;
+            bottom: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: {MUTED_TEXT};
+            font-size: 12px;
+            font-weight: 700;
+        }}
+
+        .axis-label-y {{
+            position: absolute;
+            top: 50%;
+            left: -24px;
+            transform: rotate(-90deg) translateY(-50%);
+            transform-origin: left top;
+            color: {MUTED_TEXT};
+            font-size: 12px;
+            font-weight: 700;
+        }}
+
+        .bubble {{
+            position: absolute;
+            width: 112px;
+            min-height: 38px;
+            padding: 7px 10px;
+            border-radius: 999px;
+            background: {BURGUNDY};
+            color: white;
+            text-align: center;
+            font-size: 11px;
+            line-height: 1.25;
+            font-weight: 800;
+            box-shadow: 0 10px 24px rgba(91,14,45,0.16);
+        }}
+
+        .heatmap {{
+            display: grid;
+            grid-template-columns: 155px repeat(6, 1fr);
+            border: 1px solid {BORDER_GREY};
+            border-radius: 18px;
+            overflow: hidden;
+            background: white;
+        }}
+
+        .heat-cell {{
+            padding: 12px 10px;
+            border-right: 1px solid {BORDER_GREY};
+            border-bottom: 1px solid {BORDER_GREY};
+            font-size: 12px;
+            font-weight: 750;
+            text-align: center;
+        }}
+
+        .heat-head {{
+            background: {BURGUNDY};
+            color: white;
+        }}
+
+        .heat-row {{
+            background: #FAFAFB;
+            color: {BURGUNDY};
+            text-align: left;
+        }}
+
+        .high {{
+            background: {BURGUNDY};
+            color: white;
+        }}
+
+        .medium {{
+            background: {SOFT_ROSE};
+            color: {DARK_TEXT};
+        }}
+
+        .low {{
+            background: #F1E5E9;
+            color: {MUTED_TEXT};
+        }}
+
+        .svg-wrap {{
+            width: 100%;
+            overflow-x: auto;
+            border: 1px solid {BORDER_GREY};
+            border-radius: 18px;
+            background: white;
+        }}
+
+        .report-line {{
+            line-height: 1.7;
+            font-size: 14.5px;
+            color: {DARK_TEXT};
+        }}
+
+        .footer-smr {{
+            text-align: center;
+            color: {MUTED_TEXT};
+            font-size: 12px;
+            padding: 20px 0 6px 0;
+            border-top: 1px solid {BORDER_GREY};
+            margin-top: 28px;
+        }}
+
+        .stTextInput input {{
+            border-radius: 10px !important;
+            border: 1px solid {BORDER_GREY} !important;
+            height: 42px !important;
+            font-size: 14px !important;
+        }}
+
+        .stButton > button {{
+            background: linear-gradient(135deg, {BURGUNDY} 0%, {BURGUNDY_DARK} 100%) !important;
+            color: white !important;
+            border-radius: 10px !important;
+            border: 0 !important;
+            font-weight: 800 !important;
+            height: 42px !important;
+        }}
+
+        .stButton > button:hover {{
+            border: 0 !important;
+            color: white !important;
+            transform: translateY(-1px);
+        }}
+
+        @media (max-width: 900px) {{
+            .kpi-grid {{
+                grid-template-columns: repeat(1, minmax(0, 1fr));
+            }}
+            .hero {{
+                padding: 30px;
+            }}
+            .hero h1 {{
+                font-size: 30px;
+            }}
+            .heatmap {{
+                grid-template-columns: 130px repeat(6, 145px);
+                overflow-x: auto;
+            }}
+        }}
+        </style>
+        """,
         unsafe_allow_html=True,
     )
 
-    username = st.text_input("Username", key="username")
-    password = st.text_input("Password", type="password", key="password")
 
-    if st.button("Login"):
-        if username == USERNAME and password == PASSWORD:
-            st.success("Authenticated!")
-            return True
-        else:
-            st.error("Invalid credentials")
-    return False
+# =============================================================================
+# LOGIN
+# =============================================================================
+def login_screen():
+    st.markdown("<div style='height:10vh;'></div>", unsafe_allow_html=True)
+    c1, c2, c3 = st.columns([1.2, 1.0, 1.2])
 
-
-# -----------------------------------------------------------------------------
-# KPI CARDS
-# -----------------------------------------------------------------------------
-def render_kpi_cards():
-    """
-    Display a row of KPI teaser cards summarizing high-level metrics.
-    Values are masked as per confidentiality rules.
-    """
-    kpis = [
-        ("Global Market Opportunity", "US$ [Proprietary]", "2025–2035 window"),
-        ("Europe/UK/CH SAM", "US$ [Proprietary]", "CETP-relevant pool"),
-        ("Menarini SOM Potential", "US$ [Proprietary]", "Estimated SOM by 2035"),
-        ("Launch Window", "[Available in Full Report]", "Regulatory timing"),
-        ("Eligible Patient Pool", "[Proprietary] patients", "High-risk candidates"),
-        ("Forecast Horizon", "2025–2035", "Study period"),
-    ]
-
-    cols = st.columns(len(kpis))
-    for idx, (title, value, subtitle) in enumerate(kpis):
-        with cols[idx]:
-            st.markdown(
-                f"""
-                <div class='kpi-card'>
-                    <div class='kpi-title'>{title}</div>
-                    <div class='kpi-value'>{value}</div>
-                    <div class='kpi-subtitle'>{subtitle}</div>
+    with c2:
+        st.markdown(
+            f"""
+            <div style="background:{WHITE};border:1px solid {BORDER_GREY};border-radius:22px;padding:26px 28px;box-shadow:0 18px 48px rgba(58,7,28,0.10);">
+                <div style="text-align:center;font-size:24px;font-weight:900;color:{BURGUNDY};letter-spacing:-0.02em;">Strategic Market Research</div>
+                <div style="text-align:center;font-size:12px;font-weight:800;color:{GOLD};letter-spacing:0.08em;text-transform:uppercase;margin-top:6px;margin-bottom:18px;">Secure Client Preview</div>
+                <div style="text-align:center;font-size:13px;color:{MUTED_TEXT};line-height:1.5;margin-bottom:18px;">
+                    Confidential sample report dashboard prepared for Menarini.
                 </div>
-                """,
-                unsafe_allow_html=True,
-            )
-
-
-# -----------------------------------------------------------------------------
-# CHARTS
-# -----------------------------------------------------------------------------
-def create_tam_sam_som_funnel():
-    """
-    Create a funnel chart showing TAM, SAM, SOM and Menarini opportunity.
-    All values are masked as placeholders.  The width of bars is equal
-    because we cannot expose actual numbers; however, the order conveys
-    strategic narrowing from broad market to client revenue.
-    """
-    labels = [
-        "Practical TAM",
-        "CETP-Addressable SAM",
-        "Menarini Territory SOM",
-        "Menarini Capturable Opportunity",
-    ]
-    values = [1000, 600, 300, 100]  # dummy data for equal width
-    fig = go.Figure(
-        go.Funnel(
-            y=labels,
-            x=values,
-            text=["US$ [Proprietary]" for _ in values],
-            hovertemplate="%{y}: US$ [Proprietary]<extra></extra>",
-            textposition="inside",
-            textfont=dict(color=WHITE),
-            marker=dict(color=[BURGUNDY, MID_BURGUNDY, SOFT_ROSE, GOLD]),
-        )
-    )
-    fig.update_layout(
-        title={
-            "text": "TAM / SAM / SOM Funnel (Masked)",
-            "y": 0.94,
-            "x": 0.5,
-            "xanchor": "center",
-            "yanchor": "top",
-            "font": dict(color=DARK_TEXT, size=18, family="sans-serif"),
-        },
-        plot_bgcolor=WHITE,
-        paper_bgcolor=WHITE,
-    )
-    return fig
-
-
-def create_competitive_matrix():
-    """
-    Create a qualitative 2x2 matrix comparing therapy classes based on
-    commercial maturity and LDL-C differentiation.  Each therapy is a bubble
-    with relative strategic relevance encoded as bubble size.
-    """
-    therapies = [
-        "Statins",
-        "Ezetimibe",
-        "PCSK9 mAbs",
-        "Inclisiran",
-        "Bempedoic Acid",
-        "Obicetrapib",
-        "Obicetrapib + Ezetimibe FDC",
-        "Other CETP inhibitors",
-    ]
-    maturity = [9, 6, 7, 5, 5, 3, 2, 1]  # qualitative scale (10 highest)
-    differentiation = [5, 4, 8, 7, 5, 9, 8, 6]  # qualitative scale
-    sizes = [30, 25, 35, 30, 25, 40, 38, 20]
-
-    fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(
-            x=maturity,
-            y=differentiation,
-            mode="markers+text",
-            text=therapies,
-            textposition="top center",
-            marker=dict(
-                size=sizes,
-                color=BURGUNDY,
-                line=dict(color=WHITE, width=1),
-                opacity=0.8,
-            ),
-            hovertemplate="<b>%{text}</b><br>Maturity: %{x}<br>Diff: %{y}<extra></extra>",
-        )
-    )
-    fig.update_layout(
-        title={
-            "text": "Competitive Intensity vs Differentiation",
-            "y": 0.95,
-            "x": 0.5,
-            "xanchor": "center",
-            "yanchor": "top",
-            "font": dict(color=DARK_TEXT, size=18),
-        },
-        xaxis=dict(
-            title="Commercial Maturity (Qualitative)",
-            color=DARK_TEXT,
-            showgrid=False,
-            range=[0, 10],
-            zeroline=False,
-        ),
-        yaxis=dict(
-            title="LDL-C Differentiation (Qualitative)",
-            color=DARK_TEXT,
-            showgrid=False,
-            range=[0, 10],
-            zeroline=False,
-        ),
-        plot_bgcolor=WHITE,
-        paper_bgcolor=WHITE,
-        height=500,
-    )
-    return fig
-
-
-def create_regional_heatmap():
-    """
-    Create a heatmap showing qualitative regional launch readiness across
-    key dimensions.  The scores are symbolic (High = 3, Medium = 2, Low = 1).
-    """
-    regions = [
-        "Europe",
-        "United Kingdom",
-        "Switzerland",
-        "United States",
-        "Japan",
-        "China",
-        "Rest of World",
-    ]
-    factors = [
-        "Reimbursement readiness",
-        "LDL-C treatment gap",
-        "Specialist adoption",
-        "Pricing potential",
-        "Menarini fit",
-        "Competitive pressure",
-    ]
-    # Qualitative scores (3=High, 2=Medium, 1=Low)
-    data = np.array(
-        [
-            [3, 3, 2, 3, 3, 2],
-            [3, 3, 2, 3, 2, 3],
-            [3, 2, 2, 3, 3, 2],
-            [2, 3, 3, 2, 1, 3],
-            [2, 2, 2, 2, 1, 2],
-            [2, 3, 2, 2, 2, 2],
-            [1, 1, 1, 1, 1, 1],
-        ]
-    )
-    fig = go.Figure(
-        data=go.Heatmap(
-            z=data,
-            x=factors,
-            y=regions,
-            colorscale=[
-                [0.0, SOFT_ROSE],
-                [0.33, MID_BURGUNDY],
-                [0.66, BURGUNDY],
-                [1.0, GOLD],
-            ],
-            showscale=False,
-            hovertemplate="<b>%{y} – %{x}</b><br>Score: [Qualitative]<extra></extra>",
-        )
-    )
-    fig.update_layout(
-        title={
-            "text": "Regional Launch Readiness Heatmap",
-            "x": 0.5,
-            "xanchor": "center",
-            "y": 0.9,
-            "yanchor": "top",
-            "font": dict(color=DARK_TEXT, size=18),
-        },
-        xaxis=dict(color=DARK_TEXT, tickangle=-45),
-        yaxis=dict(color=DARK_TEXT),
-        plot_bgcolor=WHITE,
-        paper_bgcolor=WHITE,
-        height=500,
-    )
-    return fig
-
-
-def create_commercial_pathway_sankey():
-    """
-    Create a Sankey diagram representing the commercial pathway from high-risk
-    dyslipidemia patients to the Menarini commercial opportunity.  All flows
-    use equal symbolic values to avoid revealing numbers.
-    """
-    labels = [
-        "High-risk dyslipidemia pts",
-        "Uncontrolled LDL-C",
-        "CETP-eligible pool",
-        "Obicetrapib Mono Opportunity",
-        "Obicetrapib/Ezetimibe FDC Opportunity",
-        "Menarini Commercial Opportunity",
-    ]
-    # Each link has same value since actual numbers are confidential
-    source = [0, 1, 2, 2, 3]  # 0->1,1->2,2->3,2->4,4->5
-    target = [1, 2, 3, 4, 5]
-    value = [10, 10, 5, 5, 10]
-
-    fig = go.Figure(
-        go.Sankey(
-            node=dict(
-                pad=15,
-                thickness=15,
-                line=dict(color=BORDER_GREY, width=0.5),
-                label=labels,
-                color=[BURGUNDY, MID_BURGUNDY, SOFT_ROSE, GOLD, BURGUNDY_DARK, MID_BURGUNDY],
-            ),
-            link=dict(
-                source=source,
-                target=target,
-                value=value,
-                color=[BURGUNDY, MID_BURGUNDY, SOFT_ROSE, GOLD, BURGUNDY],
-                hovertemplate="%{source.label} → %{target.label}<extra></extra>",
-            ),
-        )
-    )
-
-    fig.update_layout(
-        title={
-            "text": "Commercialization Pathway",
-            "x": 0.5,
-            "y": 0.9,
-            "xanchor": "center",
-            "yanchor": "top",
-            "font": dict(color=DARK_TEXT, size=18),
-        },
-        plot_bgcolor=WHITE,
-        paper_bgcolor=WHITE,
-        height=500,
-    )
-    return fig
-
-
-def create_risk_radar_chart():
-    """
-    Create a radar chart illustrating risk vs control across key strategic
-    dimensions.  Use relative values 1-5 to represent qualitative risk.
-    """
-    metrics = [
-        "Regulatory timing",
-        "Payer acceptance",
-        "Competitive displacement",
-        "Physician adoption",
-        "FDC differentiation",
-        "Pricing discipline",
-        "Evidence durability",
-    ]
-    values = [4, 3, 2, 4, 3, 2, 3]  # relative risk (higher = higher risk)
-    values += values[:1]  # close the loop
-
-    fig = go.Figure(
-        data=go.Scatterpolar(
-            r=values,
-            theta=metrics + [metrics[0]],
-            fill="toself",
-            name="Risk Profile",
-            line=dict(color=BURGUNDY),
-            hovertemplate="%{theta}: [Qualitative Risk]<extra></extra>",
-        )
-    )
-    fig.update_layout(
-        polar=dict(
-            radialaxis=dict(
-                visible=True,
-                range=[0, 5],
-                showticklabels=False,
-            ),
-            angularaxis=dict(
-                rotation=90,
-                direction="clockwise",
-                tickfont=dict(size=11, color=DARK_TEXT),
-            ),
-        ),
-        showlegend=False,
-        title={
-            "text": "Risk vs Control Radar",
-            "x": 0.5,
-            "y": 0.9,
-            "xanchor": "center",
-            "yanchor": "top",
-            "font": dict(color=DARK_TEXT, size=18),
-        },
-        plot_bgcolor=WHITE,
-        paper_bgcolor=WHITE,
-        height=500,
-    )
-    return fig
-
-
-def create_therapy_transition_map():
-    """
-    Create a Sankey-like flow illustrating transitions from baseline therapy to
-    next-gen CETP and FDC therapy.  The flows are symbolic and equal in size.
-    """
-    labels = [
-        "Baseline Therapy (Generic)",
-        "Add-on Oral Therapy",
-        "Injectable Biologic Therapy",
-        "Long-acting RNA Therapy",
-        "Next-Gen CETP / FDC Therapy",
-    ]
-    source = [0, 1, 1, 2]
-    target = [1, 2, 3, 4]
-    value = [40, 30, 20, 30]
-
-    fig = go.Figure(
-        go.Sankey(
-            node=dict(
-                pad=15,
-                thickness=15,
-                label=labels,
-                color=[BURGUNDY, MID_BURGUNDY, SOFT_ROSE, GOLD, BURGUNDY_DARK],
-                line=dict(color=BORDER_GREY, width=0.5),
-            ),
-            link=dict(
-                source=source,
-                target=target,
-                value=value,
-                color=[BURGUNDY, MID_BURGUNDY, SOFT_ROSE, GOLD],
-                hovertemplate="%{source.label} → %{target.label}<extra></extra>",
-            ),
-        )
-    )
-    fig.update_layout(
-        title={
-            "text": "Therapy Class Transition Map",
-            "x": 0.5,
-            "y": 0.9,
-            "xanchor": "center",
-            "yanchor": "top",
-            "font": dict(color=DARK_TEXT, size=18),
-        },
-        plot_bgcolor=WHITE,
-        paper_bgcolor=WHITE,
-        height=500,
-    )
-    return fig
-
-
-def create_value_architecture_network():
-    """
-    Create a network chart to illustrate the report's value architecture.
-    Use circles and lines to represent how research components feed into
-    strategic decisions.  Node sizes and positions are symbolic.
-    """
-    # Coordinates for nodes
-    nodes = {
-        "Epidemiology": (0, 0),
-        "Treatment Revenue Pools": (1, -1),
-        "LDL-C Gap": (1, 1),
-        "CETP Clinical Evidence": (2, 0),
-        "Pricing Benchmarks": (3, -1),
-        "Regulatory Timing": (3, 1),
-        "Competitive Landscape": (4, 0),
-        "Adoption Readiness": (5, -1),
-        "Menarini Strategy": (5, 1),
-    }
-    fig = go.Figure()
-    # Add nodes
-    for label, (x, y) in nodes.items():
-        fig.add_trace(
-            go.Scatter(
-                x=[x],
-                y=[y],
-                mode="markers+text",
-                marker=dict(size=20, color=BURGUNDY),
-                text=label,
-                textposition="bottom center",
-                hovertemplate=f"{label}<extra></extra>",
-            )
-        )
-    # Add connections
-    connections = [
-        ("Epidemiology", "Treatment Revenue Pools"),
-        ("Epidemiology", "LDL-C Gap"),
-        ("Treatment Revenue Pools", "CETP Clinical Evidence"),
-        ("LDL-C Gap", "CETP Clinical Evidence"),
-        ("CETP Clinical Evidence", "Pricing Benchmarks"),
-        ("CETP Clinical Evidence", "Regulatory Timing"),
-        ("Pricing Benchmarks", "Competitive Landscape"),
-        ("Regulatory Timing", "Competitive Landscape"),
-        ("Competitive Landscape", "Adoption Readiness"),
-        ("Competitive Landscape", "Menarini Strategy"),
-    ]
-    for src, dst in connections:
-        x0, y0 = nodes[src]
-        x1, y1 = nodes[dst]
-        fig.add_trace(
-            go.Scatter(
-                x=[x0, x1],
-                y=[y0, y1],
-                mode="lines",
-                line=dict(color=BORDER_GREY, width=1),
-                hoverinfo="skip",
-            )
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
 
-    fig.update_layout(
-        title={
-            "text": "Report Value Architecture",
-            "x": 0.5,
-            "y": 0.9,
-            "xanchor": "center",
-            "yanchor": "top",
-            "font": dict(color=DARK_TEXT, size=18),
-        },
-        showlegend=False,
-        xaxis=dict(visible=False),
-        yaxis=dict(visible=False),
-        plot_bgcolor=WHITE,
-        paper_bgcolor=WHITE,
-        height=500,
+        with st.form("login_form", clear_on_submit=False):
+            username = st.text_input("Username", placeholder="SMR")
+            password = st.text_input("Password", type="password", placeholder="SMR@2026")
+            login_btn = st.form_submit_button("Enter Dashboard", use_container_width=True)
+
+        if login_btn:
+            if username == USERNAME and password == PASSWORD:
+                st.session_state["logged_in"] = True
+                st.rerun()
+            else:
+                st.error("Invalid username or password.")
+
+
+# =============================================================================
+# HELPERS
+# =============================================================================
+def footer():
+    st.markdown(
+        """
+        <div class="footer-smr">
+            © 2026 Strategic Market Research. Confidential sample report preview prepared for Menarini.
+            Full quantitative outputs available in the complete report.
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
-    return fig
 
 
-# -----------------------------------------------------------------------------
-# SECTION RENDERING FUNCTIONS
-# -----------------------------------------------------------------------------
-def render_cover():
-    """
-    Render the cover page with report title, subtitle, prepared by, and prepared
-    for information.  Use a gradient background and central alignment.
-    """
+def section_card(title, subtitle="", body_html=""):
     st.markdown(
         f"""
-        <div style='background: linear-gradient(135deg, {BURGUNDY} 0%, {MID_BURGUNDY} 100%); padding: 4rem; border-radius: 8px;'>
-            <div style='text-align: center; color: {WHITE};'>
-                <h1 style='font-size: 42px; margin-bottom: 0.5rem;'>
-                    Global CETP Inhibitors Market Preview
-                </h1>
-                <h3 style='font-size: 20px; font-weight: 400; color: {SOFT_ROSE}; margin-top: 0;'>
-                    2025–2035: Obicetrapib & Next‑Generation Lipid‑Lowering Opportunity
-                </h3>
-                <p style='font-size: 16px; margin: 1.5rem 0;'>
-                    Prepared by <strong>Strategic Market Research</strong><br>
-                    Prepared for <strong>Menarini</strong><br>
-                    Confidential Sample Report Preview
-                </p>
+        <div class="section-card">
+            <div class="section-title">{html.escape(title)}</div>
+            {f'<div class="section-subtitle">{html.escape(subtitle)}</div>' if subtitle else ''}
+            {body_html}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def report_excerpt(section_key, max_lines=None):
+    text = REPORT_SECTIONS.get(section_key, "")
+    lines = text.splitlines()
+    if max_lines:
+        lines = lines[:max_lines]
+    return f"<div class='text-panel report-line'>{format_report_text(chr(10).join(lines))}</div>"
+
+
+# =============================================================================
+# PURE HTML / SVG CHARTS
+# =============================================================================
+def chart_tam_sam_som_funnel():
+    st.markdown(
+        f"""
+        <div class="chart-card">
+            <div class="chart-title">TAM / SAM / SOM Funnel</div>
+            <div class="chart-caption">
+                The full report quantifies each market layer, but this preview masks all proprietary values while preserving the strategic narrowing logic.
+            </div>
+            <div class="funnel-row" style="width:100%;background:{BURGUNDY};">
+                <span>Lipid-Lowering Therapy Revenue Pool</span><span>US$ [Proprietary]</span>
+            </div>
+            <div class="funnel-row" style="width:84%;background:{MID_BURGUNDY};">
+                <span>CETP-Relevant Opportunity</span><span>US$ [Proprietary]</span>
+            </div>
+            <div class="funnel-row" style="width:66%;background:{SOFT_ROSE};color:{DARK_TEXT};">
+                <span>Obicetrapib-Addressable Pool</span><span>US$ [Proprietary]</span>
+            </div>
+            <div class="funnel-row" style="width:48%;background:{GOLD};color:{DARK_TEXT};">
+                <span>Menarini Commercial Opportunity</span><span>US$ [Proprietary]</span>
             </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
-    st.write("")
-    render_kpi_cards()
+
+
+def chart_competitive_matrix():
+    bubbles = [
+        ("Statins", 72, 68, BURGUNDY_DARK),
+        ("Ezetimibe", 61, 62, MID_BURGUNDY),
+        ("PCSK9 mAbs", 54, 24, GOLD),
+        ("Inclisiran", 44, 30, SOFT_ROSE),
+        ("Bempedoic Acid", 48, 56, MID_BURGUNDY),
+        ("Obicetrapib", 64, 19, BURGUNDY),
+        ("Obicetrapib + Ezetimibe FDC", 50, 16, BURGUNDY),
+        ("Other CETP", 25, 34, SOFT_ROSE),
+    ]
+
+    bubble_html = ""
+    for label, left, top, color in bubbles:
+        bubble_html += f"""
+        <div class="bubble" style="left:{left}%;top:{top}%;background:{color};">{html.escape(label)}</div>
+        """
+
+    st.markdown(
+        f"""
+        <div class="chart-card">
+            <div class="chart-title">Competitive Intensity vs Differentiation Matrix</div>
+            <div class="chart-caption">
+                Therapy classes are placed on qualitative axes. No numeric scores are disclosed in this sample preview.
+            </div>
+            <div class="matrix">
+                {bubble_html}
+                <div class="axis-label-x">Commercial maturity →</div>
+                <div class="axis-label-y">LDL-C differentiation / residual-risk relevance →</div>
+                <div style="position:absolute;left:12px;top:10px;color:{MUTED_TEXT};font-size:12px;font-weight:700;">High differentiation / lower maturity</div>
+                <div style="position:absolute;right:12px;bottom:34px;color:{MUTED_TEXT};font-size:12px;font-weight:700;">High maturity / lower differentiation</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def chart_heatmap():
+    rows = {
+        "Europe": ["High", "High", "Medium", "High", "High", "Medium"],
+        "United Kingdom": ["High", "High", "Medium", "High", "Medium", "High"],
+        "Switzerland": ["High", "Medium", "Medium", "High", "High", "Medium"],
+        "United States": ["Medium", "High", "High", "High", "Low", "High"],
+        "Japan": ["Medium", "Medium", "Medium", "Medium", "Low", "Medium"],
+        "China": ["Medium", "High", "Medium", "Medium", "Medium", "Medium"],
+        "Rest of World": ["Low", "Low", "Low", "Low", "Low", "Low"],
+    }
+    cols = ["Reimbursement", "LDL-C Gap", "Specialist Adoption", "Pricing Potential", "Menarini Fit", "Competitive Pressure"]
+
+    html_grid = "<div class='heatmap'>"
+    html_grid += "<div class='heat-cell heat-head'>Region</div>"
+    for c in cols:
+        html_grid += f"<div class='heat-cell heat-head'>{html.escape(c)}</div>"
+
+    for region, vals in rows.items():
+        html_grid += f"<div class='heat-cell heat-row'>{html.escape(region)}</div>"
+        for v in vals:
+            cls = v.lower()
+            html_grid += f"<div class='heat-cell {cls}'>{v}</div>"
+    html_grid += "</div>"
+
+    st.markdown(
+        f"""
+        <div class="chart-card">
+            <div class="chart-title">Regional Launch Readiness Heatmap</div>
+            <div class="chart-caption">
+                Qualitative readiness view across launch-relevant markets. Underlying scores and country-level revenue tables are available in the full report.
+            </div>
+            {html_grid}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def chart_sankey():
+    st.markdown(
+        f"""
+        <div class="chart-card">
+            <div class="chart-title">Commercialization Pathway Sankey</div>
+            <div class="chart-caption">
+                Symbolic patient-to-revenue conversion flow. Flow width is illustrative only and does not reveal proprietary patient counts or market values.
+            </div>
+            <div class="svg-wrap">
+            <svg width="980" height="430" viewBox="0 0 980 430" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <linearGradient id="g1" x1="0%" x2="100%" y1="0%" y2="0%">
+                        <stop offset="0%" stop-color="{SOFT_ROSE}" stop-opacity="0.45"/>
+                        <stop offset="100%" stop-color="{BURGUNDY}" stop-opacity="0.62"/>
+                    </linearGradient>
+                </defs>
+                <rect x="28" y="52" width="190" height="62" rx="16" fill="{BURGUNDY}"/>
+                <text x="123" y="78" text-anchor="middle" fill="white" font-size="13" font-weight="800">High-risk</text>
+                <text x="123" y="96" text-anchor="middle" fill="white" font-size="13" font-weight="800">dyslipidemia</text>
+
+                <path d="M218 83 C300 83, 300 83, 382 83" stroke="url(#g1)" stroke-width="34" fill="none" opacity="0.75"/>
+                <rect x="382" y="52" width="178" height="62" rx="16" fill="{MID_BURGUNDY}"/>
+                <text x="471" y="78" text-anchor="middle" fill="white" font-size="13" font-weight="800">Uncontrolled</text>
+                <text x="471" y="96" text-anchor="middle" fill="white" font-size="13" font-weight="800">LDL-C</text>
+
+                <path d="M560 83 C625 83, 625 83, 690 83" stroke="url(#g1)" stroke-width="30" fill="none" opacity="0.75"/>
+                <rect x="690" y="52" width="210" height="62" rx="16" fill="{BURGUNDY_DARK}"/>
+                <text x="795" y="78" text-anchor="middle" fill="white" font-size="13" font-weight="800">CETP-eligible</text>
+                <text x="795" y="96" text-anchor="middle" fill="white" font-size="13" font-weight="800">population</text>
+
+                <path d="M795 114 C795 160, 640 164, 640 216" stroke="{SOFT_ROSE}" stroke-width="25" fill="none" opacity="0.62"/>
+                <path d="M795 114 C795 160, 870 164, 870 216" stroke="{GOLD}" stroke-width="25" fill="none" opacity="0.72"/>
+
+                <rect x="530" y="216" width="220" height="62" rx="16" fill="{SOFT_ROSE}"/>
+                <text x="640" y="242" text-anchor="middle" fill="{DARK_TEXT}" font-size="13" font-weight="800">Obicetrapib mono</text>
+                <text x="640" y="260" text-anchor="middle" fill="{DARK_TEXT}" font-size="13" font-weight="800">opportunity</text>
+
+                <rect x="760" y="216" width="220" height="62" rx="16" fill="{GOLD}"/>
+                <text x="870" y="242" text-anchor="middle" fill="{DARK_TEXT}" font-size="13" font-weight="800">Obicetrapib /</text>
+                <text x="870" y="260" text-anchor="middle" fill="{DARK_TEXT}" font-size="13" font-weight="800">ezetimibe FDC</text>
+
+                <path d="M640 278 C640 340, 755 340, 755 352" stroke="{SOFT_ROSE}" stroke-width="22" fill="none" opacity="0.6"/>
+                <path d="M870 278 C870 340, 755 340, 755 352" stroke="{GOLD}" stroke-width="22" fill="none" opacity="0.75"/>
+                <rect x="640" y="352" width="230" height="62" rx="16" fill="{BURGUNDY}"/>
+                <text x="755" y="378" text-anchor="middle" fill="white" font-size="13" font-weight="800">Menarini commercial</text>
+                <text x="755" y="396" text-anchor="middle" fill="white" font-size="13" font-weight="800">opportunity</text>
+
+                <text x="490" y="388" fill="{MUTED_TEXT}" font-size="13" font-weight="700">All values masked: [Proprietary]</text>
+            </svg>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def chart_radar():
+    st.markdown(
+        f"""
+        <div class="chart-card">
+            <div class="chart-title">Risk vs Control Radar</div>
+            <div class="chart-caption">
+                Relative risk exposure is shown directionally. Exact risk scores and sensitivity outputs are available in the full report.
+            </div>
+            <div class="svg-wrap">
+            <svg width="760" height="500" viewBox="0 0 760 500" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="380" cy="240" r="55" fill="none" stroke="{BORDER_GREY}" stroke-width="1"/>
+                <circle cx="380" cy="240" r="105" fill="none" stroke="{BORDER_GREY}" stroke-width="1"/>
+                <circle cx="380" cy="240" r="155" fill="none" stroke="{BORDER_GREY}" stroke-width="1"/>
+                <line x1="380" y1="85" x2="380" y2="395" stroke="{BORDER_GREY}"/>
+                <line x1="225" y1="240" x2="535" y2="240" stroke="{BORDER_GREY}"/>
+                <line x1="270" y1="130" x2="490" y2="350" stroke="{BORDER_GREY}"/>
+                <line x1="490" y1="130" x2="270" y2="350" stroke="{BORDER_GREY}"/>
+
+                <polygon points="380,105 480,160 510,255 430,342 330,340 260,245 300,150"
+                         fill="{BURGUNDY}" opacity="0.22" stroke="{BURGUNDY}" stroke-width="3"/>
+                <circle cx="380" cy="105" r="5" fill="{GOLD}"/>
+                <circle cx="480" cy="160" r="5" fill="{GOLD}"/>
+                <circle cx="510" cy="255" r="5" fill="{GOLD}"/>
+                <circle cx="430" cy="342" r="5" fill="{GOLD}"/>
+                <circle cx="330" cy="340" r="5" fill="{GOLD}"/>
+                <circle cx="260" cy="245" r="5" fill="{GOLD}"/>
+                <circle cx="300" cy="150" r="5" fill="{GOLD}"/>
+
+                <text x="380" y="65" text-anchor="middle" fill="{DARK_TEXT}" font-size="13" font-weight="800">Regulatory timing</text>
+                <text x="530" y="150" fill="{DARK_TEXT}" font-size="13" font-weight="800">Payer acceptance</text>
+                <text x="545" y="260" fill="{DARK_TEXT}" font-size="13" font-weight="800">Competitive displacement</text>
+                <text x="440" y="385" fill="{DARK_TEXT}" font-size="13" font-weight="800">Physician adoption</text>
+                <text x="210" y="385" fill="{DARK_TEXT}" font-size="13" font-weight="800">FDC differentiation</text>
+                <text x="95" y="250" fill="{DARK_TEXT}" font-size="13" font-weight="800">Pricing discipline</text>
+                <text x="135" y="150" fill="{DARK_TEXT}" font-size="13" font-weight="800">Evidence durability</text>
+            </svg>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def chart_transition_map():
+    st.markdown(
+        f"""
+        <div class="chart-card">
+            <div class="chart-title">Therapy Class Transition Map</div>
+            <div class="chart-caption">
+                The lipid-lowering landscape is moving from generic volume therapy toward high-efficacy, specialist-led and next-generation oral intensification options.
+            </div>
+            <div class="svg-wrap">
+            <svg width="980" height="330" viewBox="0 0 980 330" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <linearGradient id="flow" x1="0%" x2="100%" y1="0%" y2="0%">
+                        <stop offset="0%" stop-color="{SOFT_ROSE}" stop-opacity="0.35"/>
+                        <stop offset="100%" stop-color="{BURGUNDY}" stop-opacity="0.62"/>
+                    </linearGradient>
+                </defs>
+                <rect x="40" y="120" width="165" height="70" rx="18" fill="{BURGUNDY_DARK}"/>
+                <text x="122" y="148" text-anchor="middle" fill="white" font-size="13" font-weight="800">Generic baseline</text>
+                <text x="122" y="168" text-anchor="middle" fill="white" font-size="13" font-weight="800">therapy</text>
+
+                <path d="M205 155 C260 155, 260 155, 315 155" stroke="url(#flow)" stroke-width="34" fill="none"/>
+                <rect x="315" y="120" width="165" height="70" rx="18" fill="{MID_BURGUNDY}"/>
+                <text x="397" y="148" text-anchor="middle" fill="white" font-size="13" font-weight="800">Add-on oral</text>
+                <text x="397" y="168" text-anchor="middle" fill="white" font-size="13" font-weight="800">therapy</text>
+
+                <path d="M480 155 C535 95, 535 95, 590 95" stroke="{SOFT_ROSE}" stroke-width="24" fill="none" opacity="0.7"/>
+                <path d="M480 155 C535 215, 535 215, 590 215" stroke="{GOLD}" stroke-width="24" fill="none" opacity="0.7"/>
+
+                <rect x="590" y="60" width="165" height="70" rx="18" fill="{SOFT_ROSE}"/>
+                <text x="672" y="88" text-anchor="middle" fill="{DARK_TEXT}" font-size="13" font-weight="800">Injectable biologic</text>
+                <text x="672" y="108" text-anchor="middle" fill="{DARK_TEXT}" font-size="13" font-weight="800">therapy</text>
+
+                <rect x="590" y="180" width="165" height="70" rx="18" fill="{GOLD}"/>
+                <text x="672" y="208" text-anchor="middle" fill="{DARK_TEXT}" font-size="13" font-weight="800">Long-acting RNA</text>
+                <text x="672" y="228" text-anchor="middle" fill="{DARK_TEXT}" font-size="13" font-weight="800">therapy</text>
+
+                <path d="M755 95 C815 95, 815 155, 875 155" stroke="{SOFT_ROSE}" stroke-width="22" fill="none" opacity="0.65"/>
+                <path d="M755 215 C815 215, 815 155, 875 155" stroke="{GOLD}" stroke-width="22" fill="none" opacity="0.65"/>
+                <rect x="805" y="120" width="165" height="70" rx="18" fill="{BURGUNDY}"/>
+                <text x="887" y="148" text-anchor="middle" fill="white" font-size="13" font-weight="800">Next-gen oral</text>
+                <text x="887" y="168" text-anchor="middle" fill="white" font-size="13" font-weight="800">CETP / FDC</text>
+            </svg>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def chart_value_architecture():
+    st.markdown(
+        f"""
+        <div class="chart-card">
+            <div class="chart-title">Report Value Architecture</div>
+            <div class="chart-caption">
+                The full report connects evidence, market structure and commercialization strategy into decision-ready outputs for Menarini.
+            </div>
+            <div class="svg-wrap">
+            <svg width="980" height="420" viewBox="0 0 980 420" xmlns="http://www.w3.org/2000/svg">
+                <style>
+                    .node {{ fill:{BURGUNDY}; stroke:white; stroke-width:2; }}
+                    .goldnode {{ fill:{GOLD}; stroke:white; stroke-width:2; }}
+                    .line {{ stroke:{BORDER_GREY}; stroke-width:3; }}
+                    .txt {{ fill:{DARK_TEXT}; font-size:13px; font-weight:800; }}
+                    .wh {{ fill:white; font-size:13px; font-weight:800; }}
+                </style>
+
+                <line class="line" x1="135" y1="210" x2="300" y2="125"/>
+                <line class="line" x1="135" y1="210" x2="300" y2="295"/>
+                <line class="line" x1="300" y1="125" x2="485" y2="210"/>
+                <line class="line" x1="300" y1="295" x2="485" y2="210"/>
+                <line class="line" x1="485" y1="210" x2="655" y2="125"/>
+                <line class="line" x1="485" y1="210" x2="655" y2="295"/>
+                <line class="line" x1="655" y1="125" x2="835" y2="210"/>
+                <line class="line" x1="655" y1="295" x2="835" y2="210"/>
+
+                <circle class="node" cx="135" cy="210" r="62"/>
+                <text class="wh" x="135" y="205" text-anchor="middle">Epidemiology</text>
+                <text class="wh" x="135" y="224" text-anchor="middle">inputs</text>
+
+                <circle class="node" cx="300" cy="125" r="62"/>
+                <text class="wh" x="300" y="120" text-anchor="middle">Revenue</text>
+                <text class="wh" x="300" y="139" text-anchor="middle">pools</text>
+
+                <circle class="node" cx="300" cy="295" r="62"/>
+                <text class="wh" x="300" y="290" text-anchor="middle">LDL-C gap</text>
+                <text class="wh" x="300" y="309" text-anchor="middle">logic</text>
+
+                <circle class="goldnode" cx="485" cy="210" r="70"/>
+                <text class="txt" x="485" y="198" text-anchor="middle">CETP clinical</text>
+                <text class="txt" x="485" y="217" text-anchor="middle">evidence</text>
+                <text class="txt" x="485" y="236" text-anchor="middle">engine</text>
+
+                <circle class="node" cx="655" cy="125" r="62"/>
+                <text class="wh" x="655" y="120" text-anchor="middle">Pricing</text>
+                <text class="wh" x="655" y="139" text-anchor="middle">benchmarks</text>
+
+                <circle class="node" cx="655" cy="295" r="62"/>
+                <text class="wh" x="655" y="290" text-anchor="middle">Regulatory</text>
+                <text class="wh" x="655" y="309" text-anchor="middle">timing</text>
+
+                <circle class="goldnode" cx="835" cy="210" r="70"/>
+                <text class="txt" x="835" y="198" text-anchor="middle">Menarini</text>
+                <text class="txt" x="835" y="217" text-anchor="middle">commercial</text>
+                <text class="txt" x="835" y="236" text-anchor="middle">strategy</text>
+            </svg>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+# =============================================================================
+# TABLES
+# =============================================================================
+def render_market_layer_table():
+    st.markdown(
+        f"""
+        <div class="chart-card">
+            <div class="chart-title">Market Layer Architecture & Definitions</div>
+            <div class="chart-caption">Numerical values are masked; the structural logic remains visible in the preview.</div>
+            <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                <thead>
+                    <tr style="background:{BURGUNDY};color:white;">
+                        <th style="padding:12px;text-align:left;">Market Layer</th>
+                        <th style="padding:12px;text-align:left;">Definition</th>
+                        <th style="padding:12px;text-align:left;">Starts From</th>
+                        <th style="padding:12px;text-align:left;">Use in Forecast</th>
+                        <th style="padding:12px;text-align:left;">Relevance to Menarini</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};font-weight:800;color:{BURGUNDY};">Strict CETP Market</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Revenue from approved CETP inhibitors only</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">2027 launch</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Core growth metric</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Client product sales</td></tr>
+                    <tr><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};font-weight:800;color:{BURGUNDY};">Practical TAM</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Current revenue of relevant lipid-lowering therapies</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">2025</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Ceiling / budget-pool logic</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Competitive revenue pool</td></tr>
+                    <tr><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};font-weight:800;color:{BURGUNDY};">SAM</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">CETP-addressable subset after label and access filters</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">2027</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Eligible pool</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Territory volume potential</td></tr>
+                    <tr><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};font-weight:800;color:{BURGUNDY};">SOM</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Obicetrapib revenue in Menarini territory</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">2027</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Financial forecast</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Direct client revenue and profit</td></tr>
+                </tbody>
+            </table>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_risk_table():
+    st.markdown(
+        f"""
+        <div class="chart-card">
+            <div class="chart-title">Risk / Barrier Matrix</div>
+            <div class="chart-caption">Market impact values are masked and shown directionally.</div>
+            <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                <thead>
+                    <tr style="background:{BURGUNDY};color:white;">
+                        <th style="padding:12px;text-align:left;">Risk</th>
+                        <th style="padding:12px;text-align:left;">Severity</th>
+                        <th style="padding:12px;text-align:left;">Probability</th>
+                        <th style="padding:12px;text-align:left;">Market Impact</th>
+                        <th style="padding:12px;text-align:left;">Mitigation Priority</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};font-weight:800;color:{BURGUNDY};">Narrow Label</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">High</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Medium</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">[Proprietary] reduction in SAM</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">HTA dossier preparation</td></tr>
+                    <tr><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};font-weight:800;color:{BURGUNDY};">Class Skepticism</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">High</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Medium</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Slower adoption ramp</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Medical education</td></tr>
+                    <tr><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};font-weight:800;color:{BURGUNDY};">Injectable Substitution</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Medium</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">High</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Caps high-risk share</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Oral biologic positioning</td></tr>
+                    <tr><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};font-weight:800;color:{BURGUNDY};">FDC Delay</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Medium</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Low</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Blended price pressure</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">MAA strategy</td></tr>
+                </tbody>
+            </table>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+# =============================================================================
+# PAGES
+# =============================================================================
+def render_cover():
+    st.markdown(
+        f"""
+        <div class="hero">
+            <div class="hero-kicker">Confidential Sample Report Preview</div>
+            <h1>Global CETP Inhibitors Market Preview</h1>
+            <h2>2025–2035: Obicetrapib, Next-Generation Lipid-Lowering Therapy & Strategic Positioning for Menarini</h2>
+            <p>
+                Prepared by <b>Strategic Market Research</b> for <b>Menarini</b>.
+                This dashboard previews the report architecture, strategic logic, competitive framing and commercialization implications.
+                All proprietary market values, patient counts, percentages and forecast outputs are intentionally masked.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        """
+        <div class="kpi-grid">
+            <div class="kpi-card"><div class="kpi-label">Global Market Opportunity</div><div class="kpi-value">US$ [Proprietary]</div><div class="kpi-note">Full value available in complete report</div></div>
+            <div class="kpi-card"><div class="kpi-label">Europe / UK / Switzerland SAM</div><div class="kpi-value">US$ [Proprietary]</div><div class="kpi-note">CETP-addressable opportunity</div></div>
+            <div class="kpi-card"><div class="kpi-label">Menarini SOM Potential</div><div class="kpi-value">US$ [Proprietary]</div><div class="kpi-note">Launch-driven territory capture</div></div>
+            <div class="kpi-card"><div class="kpi-label">Launch Window</div><div class="kpi-value">[Available in Full Report]</div><div class="kpi-note">Regulatory and reimbursement timing</div></div>
+            <div class="kpi-card"><div class="kpi-label">Eligible Patient Pool</div><div class="kpi-value">[Proprietary] patients</div><div class="kpi-note">High-risk uncontrolled LDL-C pool</div></div>
+            <div class="kpi-card"><div class="kpi-label">Forecast Horizon</div><div class="kpi-value">2025–2035</div><div class="kpi-note">Commercial forecast period</div></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    section_card(
+        "Executive Thesis",
+        "CETP inhibitors are being repositioned from a historically challenged mechanism into a potential next-generation oral lipid-lowering category.",
+        report_excerpt("1. Executive Overview & Strategic Snapshot ($Mn, %, 2025–2035)", 18),
+    )
+    chart_tam_sam_som_funnel()
+    chart_competitive_matrix()
 
 
 def render_market_architecture():
-    """
-    Render the market architecture section including definitions, market layer
-    architecture table, and narrative describing TAM/SAM/SOM logic.
-    """
+    section_card(
+        "Market Architecture",
+        "The report separates the practical lipid-lowering therapy budget pool from the SAM and SOM available to CETP inhibitors after regulatory approval and payer access.",
+        report_excerpt("2. Market Definition, Scope & TAM/SAM/SOM Architecture"),
+    )
+    render_market_layer_table()
+    chart_tam_sam_som_funnel()
+
+
+def render_opportunity_logic():
+    section_card(
+        "CETP Inhibitor Opportunity Logic",
+        "Obicetrapib reframes the CETP class by addressing historical potency and safety concerns while targeting the uncontrolled LDL-C gap.",
+        report_excerpt("3. CETP Mechanism, Class History & Repositioning Logic"),
+    )
+    chart_sankey()
+    chart_transition_map()
+
+
+def render_menarini_fit():
+    section_card(
+        "Menarini / Obicetrapib Strategic Fit",
+        "Menarini’s commercial opportunity is tied to successful HTA navigation, evidence-led physician education and territory-specific launch sequencing.",
+        report_excerpt("14. Menarini Opportunity, Value Capture & Strategic Positioning"),
+    )
+    chart_value_architecture()
+
+
+def render_tam_preview():
+    section_card(
+        "TAM / SAM / SOM Preview",
+        "The full report provides year-by-year quantitative tables, but this sample preview masks all values to preserve proprietary model outputs.",
+        report_excerpt("10. Market Size & Forecast, 2025–2035 ($Mn, Patients, %)", 50),
+    )
+    chart_tam_sam_som_funnel()
+    chart_sankey()
+
+
+def render_competitive():
+    section_card(
+        "Competitive Landscape",
+        "Direct CETP competition is limited, but substitute pressure from statins, ezetimibe, bempedoic acid, PCSK9 mAbs and inclisiran shapes adoption ceilings.",
+        report_excerpt("12. Competitive Landscape & Substitute Therapy Pressure"),
+    )
+    chart_competitive_matrix()
+    chart_transition_map()
+
+
+def render_regulatory():
+    section_card(
+        "Clinical & Regulatory Readiness",
+        "Approval timing, label breadth and outcomes evidence are critical variables in the forecast.",
+        report_excerpt("7. Obicetrapib Clinical Evidence & Pipeline Positioning") + report_excerpt("8. Regulatory Pathway, Label Scenarios & Launch Timing"),
+    )
+
+
+def render_pricing_access():
+    section_card(
+        "Pricing, Access & Adoption",
+        "Pricing strategy must navigate between low-cost generic add-ons and high-cost injectables while building a payer case for an oral biologic-like step.",
+        report_excerpt("9. Pricing, Reimbursement & Monetization Architecture ($/Patient/Year)") + report_excerpt("13. Adoption Dynamics, Access Readiness & Market Conversion"),
+    )
+
+
+def render_region():
+    section_card(
+        "Regional Launch Prioritization",
+        "Germany and the UK anchor Wave 1 commercialization, while France, Switzerland, Italy and Spain shape mid-term expansion.",
+        report_excerpt("11. Europe, UK & Switzerland Opportunity Analysis"),
+    )
+    chart_heatmap()
+
+
+def render_risk():
+    section_card(
+        "Risk, Barriers & Watchpoints",
+        "The most important downside risks relate to restrictive labeling, payer filters, CETP class skepticism and FDC timing.",
+        report_excerpt("15. Scenario Analysis & Forecast Sensitivities") + report_excerpt("16. Risk Assessment & Mitigation Framework"),
+    )
+    render_risk_table()
+    chart_radar()
+
+
+def render_strategy():
+    section_card(
+        "Strategic Roadmap & Recommendations",
+        "The commercial roadmap moves from approval preparation and Wave 1 launch to Wave 2 scaling and outcomes-supported broader adoption.",
+        report_excerpt("17. Strategic Roadmap & Future Outlook, 2025–2035"),
+    )
+    chart_value_architecture()
+
+
+def render_closing():
     st.markdown(
-        f"<div class='section-header'>Market Definition, Scope & TAM/SAM/SOM Architecture</div>",
+        f"""
+        <div class="closing-panel">
+            <h2>Why Menarini Should Access the Full Report</h2>
+            <p>
+                The CETP inhibitors market is not a conventional lipid-lowering category. It is a revived mechanism entering a crowded, payer-disciplined market where success depends on proving that obicetrapib can create biologic-like efficacy through an oral, commercially scalable model.
+            </p>
+            <p>
+                Obicetrapib’s opportunity depends on identifying the right uncontrolled LDL-C patient segments, the right launch sequence, the right reimbursement argument and the right differentiation against statins, ezetimibe, bempedoic acid, PCSK9 mAbs and inclisiran.
+            </p>
+            <ul>
+                <li>The full report unlocks complete market size, SAM and SOM values by year and geography.</li>
+                <li>It provides country-level access logic for Europe, the UK and Switzerland.</li>
+                <li>It benchmarks obicetrapib and the FDC against current and emerging lipid-lowering therapies.</li>
+                <li>It converts clinical, regulatory, payer and competitive complexity into actionable launch decisions.</li>
+                <li>The sample dashboard intentionally masks proprietary values; the full report provides the complete quantitative model.</li>
+            </ul>
+        </div>
+        """,
         unsafe_allow_html=True,
     )
 
-    # Show narrative paragraphs from report
-    for paragraph in report_sections.get(
-        "2. Market Definition, Scope & TAM/SAM/SOM Architecture", []
-    )[:5]:
-        st.markdown(paragraph)
 
+def render_full_report():
     st.markdown(
-        f"<div class='divider'></div><div class='section-header'>Market Layer Architecture & Definitions</div>",
+        """
+        <div class="section-card">
+            <div class="section-title">Full Report Summary Explorer</div>
+            <div class="section-subtitle">
+                Every section from the embedded report summary is shown below with all market-sensitive numbers masked.
+                Use the search box to filter by chapter, keyword, therapy class, geography or commercial theme.
+            </div>
+        </div>
+        """,
         unsafe_allow_html=True,
     )
 
-    # Table summarizing market layers
-    data = {
-        "Market Layer": [
-            "Strict CETP Market",
-            "Practical TAM",
-            "SAM",
-            "SOM",
-        ],
-        "Definition": [
-            "Revenue from approved CETP inhibitors only",
-            "Current revenue of all relevant lipid‑lowering therapies",
-            "CETP‑addressable subset post‑label and access filters",
-            "Obicetrapib revenue in Menarini territory",
-        ],
-        "Starts From": ["2027 (Launch)", "2025", "2027", "2027"],
-        "Use in Forecast": [
-            "Core growth metric",
-            "Ceiling context",
-            "Eligible pool",
-            "Financial forecast",
-        ],
-        "Relevance to Menarini": [
-            "Represents client product sales",
-            "Competitive revenue pool",
-            "Territory volume potential",
-            "Direct client revenue and profit",
-        ],
-    }
-    df = pd.DataFrame(data)
-    # Apply masking to ensure numbers are hidden (none present here)
-    # Render table with custom styling
-    st.markdown(
-        "<div class='table-wrapper'><table class='styled-table'>"
-        "<thead><tr><th>Market Layer</th><th>Definition</th><th>Starts From</th><th>Use in Forecast</th><th>Relevance to Menarini</th></tr></thead>",
-        unsafe_allow_html=True,
-    )
-    for i, row in df.iterrows():
+    query = st.text_input("Search report summary", placeholder="Example: obicetrapib, HTA, Germany, SAM, FDC, PCSK9")
+
+    show_all = st.toggle("Show complete summary in one continuous view", value=False)
+
+    if show_all:
         st.markdown(
-            "<tr>"
-            f"<td>{row['Market Layer']}</td>"
-            f"<td>{row['Definition']}</td>"
-            f"<td>{row['Starts From']}</td>"
-            f"<td>{row['Use in Forecast']}</td>"
-            f"<td>{row['Relevance to Menarini']}</td>"
-            "</tr>",
+            f"<div class='text-panel report-line'>{format_report_text(REPORT_TEXT)}</div>",
             unsafe_allow_html=True,
         )
-    st.markdown("</table></div>", unsafe_allow_html=True)
-
-    # Add TAM/SAM/SOM funnel chart
-    st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
-    funnel_fig = create_tam_sam_som_funnel()
-    st.plotly_chart(funnel_fig, use_container_width=True)
-
-
-def render_competitive_landscape():
-    """
-    Render the competitive landscape section including the matrix chart and
-    key narrative from the report.
-    """
-    st.markdown(
-        f"<div class='section-header'>Competitive Landscape</div>",
-        unsafe_allow_html=True,
-    )
-    for paragraph in report_sections.get(
-        "3. CETP Mechanism, Class History & Repositioning Logic", []
-    )[:3]:
-        st.markdown(paragraph)
-    matrix_fig = create_competitive_matrix()
-    st.plotly_chart(matrix_fig, use_container_width=True)
+    else:
+        for title, content in REPORT_SECTIONS.items():
+            combined = f"{title}\n{content}"
+            if query.strip() and query.lower() not in combined.lower():
+                continue
+            with st.expander(title, expanded=False):
+                st.markdown(
+                    f"<div class='report-line'>{format_report_text(content)}</div>",
+                    unsafe_allow_html=True,
+                )
 
 
-def render_patient_pool_section():
-    """
-    Render the CETP mechanism, class history, and repositioning logic.  Include
-    Sankey or other charts if relevant to illustrate patient population
-    transitions or risk vs control.
-    """
-    st.markdown(
-        f"<div class='section-header'>CETP Mechanism, Class History & Repositioning Logic</div>",
-        unsafe_allow_html=True,
-    )
-    # Show paragraphs from report
-    for paragraph in report_sections.get(
-        "3. CETP Mechanism, Class History & Repositioning Logic", []
-    ):
-        st.markdown(paragraph)
-
-    # Chart (e.g. risk radar)
-    radar_fig = create_risk_radar_chart()
-    st.plotly_chart(radar_fig, use_container_width=True)
-
-    sankey_fig = create_commercial_pathway_sankey()
-    st.plotly_chart(sankey_fig, use_container_width=True)
-
-
-def render_regional_prioritization():
-    """
-    Render the regional launch prioritization section along with the heatmap
-    and strategic narrative from the report.
-    """
-    st.markdown(
-        f"<div class='section-header'>Regional Launch Prioritization</div>",
-        unsafe_allow_html=True,
-    )
-    heatmap_fig = create_regional_heatmap()
-    st.plotly_chart(heatmap_fig, use_container_width=True)
-    for paragraph in report_sections.get(
-        "1.4. Strategic Implications for Menarini", []
-    ):
-        st.markdown(paragraph)
-
-
-def render_risk_and_value_architecture():
-    """
-    Render the risk, barriers, watchpoints, and value architecture section.
-    Includes charts for risk vs control and therapy transition map and value network.
-    """
-    st.markdown(
-        f"<div class='section-header'>Risk, Barriers & Watchpoints</div>",
-        unsafe_allow_html=True,
-    )
-    # Show relevant paragraphs (if any)
-    for paragraph in report_sections.get("Risk", []):
-        st.markdown(paragraph)
-
-    # Charts: radar (already above), transition map, value architecture
-    transition_fig = create_therapy_transition_map()
-    st.plotly_chart(transition_fig, use_container_width=True)
-
-    architecture_fig = create_value_architecture_network()
-    st.plotly_chart(architecture_fig, use_container_width=True)
-
-
-def render_strategic_implications():
-    """
-    Render a focused section on strategic recommendations and Menarini-specific
-    implications from the report.  Use narrative plus summary bullets or table.
-    """
-    st.markdown(
-        f"<div class='section-header'>Strategic Recommendations for Menarini</div>",
-        unsafe_allow_html=True,
-    )
-    # Use narrative paragraphs from 1.4 and 1.3 sections
-    for paragraph in report_sections.get(
-        "1.4. Strategic Implications for Menarini", []
-    ):
-        st.markdown(paragraph)
-    st.markdown("<strong>Key Recommendations:</strong>", unsafe_allow_html=True)
-    st.markdown(
-        """
-        - Focus on high-risk uncontrolled LDL-C patients, particularly HeFH and ASCVD populations.
-        - Position obicetrapib as a potent, oral, biologic-like alternative with superior selectivity.
-        - Leverage positive cardiovascular outcomes (PREVAIL CVOT) to differentiate and overcome historical skepticism.
-        - Prioritize Germany, UK, France, and Switzerland for launch and HTA engagement.
-        - Emphasize convenience and efficacy of fixed-dose combination vs competing oral bempedoic acid/ezetimibe FDC.
-        """,
-        unsafe_allow_html=True,
-    )
-    # Additional chart if desired (risk radar reused)
-    risk_fig = create_risk_radar_chart()
-    st.plotly_chart(risk_fig, use_container_width=True)
-
-
-def render_sales_closing():
-    """
-    Render a polished sales closing section explaining why Menarini should
-    purchase the full report.  Use narrative and callouts.
-    """
-    st.markdown(
-        f"<div class='section-header'>Why Menarini Should Access the Full Report</div>",
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        """
-        The CETP inhibitors market is poised to transform the lipid‑lowering
-        landscape, but success demands granular insight.  Our full report
-        unlocks proprietary quantitative models, country‑level segmentation,
-        therapy‑class benchmarking, launch scenarios, pricing discipline,
-        adoption multipliers, and risk sensitivity analyses that are not
-        available in this preview.
-        """,
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        """
-        **Key benefits of the full report:**
-        - Access to detailed revenue and patient forecasts across all major markets.
-        - Comprehensive competitive benchmarking against statins, ezetimibe, PCSK9 mAbs, inclisiran, bempedoic acid, and other emerging LLTs.
-        - Country‑specific regulatory timelines, payer perspectives, and pricing corridors.
-        - Robust methodology detailing TAM/SAM/SOM buildout and sensitivity analyses.
-        - Personalized strategic recommendations for Menarini’s commercialization strategy.
-        """,
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        """
-        By purchasing the full report, Menarini will gain actionable insight to drive
-        investment decisions, refine launch sequencing, optimize pricing strategy,
-        and maximize return on obicetrapib commercialization.  The quantitative
-        model supporting this preview is proprietary and accessible only through
-        the full report.
-        """,
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        """
-        **Ready to unlock the full potential?  Contact Strategic Market Research
-        to purchase the full report today.**
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-def render_full_report_explorer():
-    """
-    Render a dedicated page that allows the user to explore the full
-    masked report text using expanders for each major section.  Provide a
-    search/filter box to help navigate keywords.
-    """
-    st.markdown(
-        f"<div class='section-header'>Full Report Summary Explorer</div>",
-        unsafe_allow_html=True,
-    )
-    query = st.text_input("Search within the report", "")
-    for header, paragraphs in report_sections.items():
-        if query.lower() in header.lower() or any(
-            query.lower() in p.lower() for p in paragraphs
-        ):
-            with st.expander(header):
-                for paragraph in paragraphs:
-                    st.markdown(paragraph)
-
-
-# -----------------------------------------------------------------------------
-# FOOTER
-# -----------------------------------------------------------------------------
-def render_footer():
-    st.markdown(
-        f"<div class='footer'>© 2026 Strategic Market Research. Confidential sample report preview prepared for Menarini. Full quantitative outputs available in the complete report.</div>",
-        unsafe_allow_html=True,
-    )
-
-
-# -----------------------------------------------------------------------------
-# MAIN APP LOGIC
-# -----------------------------------------------------------------------------
+# =============================================================================
+# MAIN APP
+# =============================================================================
 def main():
-    inject_custom_css()
+    inject_css()
+
     if "logged_in" not in st.session_state:
         st.session_state["logged_in"] = False
 
     if not st.session_state["logged_in"]:
-        st.write("")
-        st.write("")
-        st.write("")
-        st.write("")
-        st.write("")
-        if login():
-            st.session_state["logged_in"] = True
-            st.experimental_rerun()
-        else:
-            render_footer()
-            return
+        login_screen()
+        footer()
+        return
 
-    # Sidebar navigation
-    pages = [
-        "Cover & Executive Snapshot",
-        "Market Architecture",
-        "CETP Mechanism & Repositioning",
-        "Regional Launch Prioritization",
-        "Risk & Value Architecture",
-        "Strategic Recommendations",
-        "Why Menarini Should Access the Full Report",
-        "Full Report Summary Explorer",
-    ]
-    st.sidebar.markdown(
-        "<h2 style='color: #FFFFFF;'>Navigation</h2>", unsafe_allow_html=True
-    )
-    selection = st.sidebar.radio("", pages)
+    with st.sidebar:
+        st.markdown(
+            f"""
+            <div style="padding:10px 0 18px 0;">
+                <div style="font-size:20px;font-weight:900;color:white;">Strategic Market Research</div>
+                <div style="font-size:11px;font-weight:800;color:{GOLD};letter-spacing:0.08em;text-transform:uppercase;margin-top:5px;">Menarini CETP Preview</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
-    if selection == "Cover & Executive Snapshot":
+        page = st.radio(
+            "Dashboard sections",
+            [
+                "Cover & Executive Snapshot",
+                "Market Architecture",
+                "CETP Inhibitor Opportunity Logic",
+                "Menarini / Obicetrapib Strategic Fit",
+                "TAM / SAM / SOM Preview",
+                "Competitive Landscape",
+                "Clinical & Regulatory Readiness",
+                "Pricing, Access & Adoption",
+                "Regional Launch Prioritization",
+                "Risk, Barriers & Watchpoints",
+                "Strategic Recommendations",
+                "Why Menarini Should Access the Full Report",
+                "Full Report Summary Explorer",
+            ],
+            label_visibility="collapsed",
+        )
+
+        st.markdown("<hr style='border-color:rgba(255,255,255,0.18);'>", unsafe_allow_html=True)
+        if st.button("End Secure Session", use_container_width=True):
+            st.session_state["logged_in"] = False
+            st.rerun()
+
+    if page == "Cover & Executive Snapshot":
         render_cover()
-    elif selection == "Market Architecture":
+    elif page == "Market Architecture":
         render_market_architecture()
-    elif selection == "CETP Mechanism & Repositioning":
-        render_patient_pool_section()
-    elif selection == "Regional Launch Prioritization":
-        render_regional_prioritization()
-    elif selection == "Risk & Value Architecture":
-        render_risk_and_value_architecture()
-    elif selection == "Strategic Recommendations":
-        render_strategic_implications()
-    elif selection == "Why Menarini Should Access the Full Report":
-        render_sales_closing()
-    elif selection == "Full Report Summary Explorer":
-        render_full_report_explorer()
+    elif page == "CETP Inhibitor Opportunity Logic":
+        render_opportunity_logic()
+    elif page == "Menarini / Obicetrapib Strategic Fit":
+        render_menarini_fit()
+    elif page == "TAM / SAM / SOM Preview":
+        render_tam_preview()
+    elif page == "Competitive Landscape":
+        render_competitive()
+    elif page == "Clinical & Regulatory Readiness":
+        render_regulatory()
+    elif page == "Pricing, Access & Adoption":
+        render_pricing_access()
+    elif page == "Regional Launch Prioritization":
+        render_region()
+    elif page == "Risk, Barriers & Watchpoints":
+        render_risk()
+    elif page == "Strategic Recommendations":
+        render_strategy()
+    elif page == "Why Menarini Should Access the Full Report":
+        render_closing()
+    elif page == "Full Report Summary Explorer":
+        render_full_report()
 
-    # Footer on all pages
-    render_footer()
+    footer()
 
 
 if __name__ == "__main__":
