@@ -926,28 +926,143 @@ Final Strategic Outlook: Analysis indicates that the CETP category revival throu
 
 
 # =============================================================================
-# MASKING LOGIC
+# CLEANING, MASKING, TABLE RENDERING LOGIC
 # =============================================================================
+TABLE_COLUMN_COUNTS = {
+    1: 5,
+    2: 5,
+    3: 5,
+    4: 5,
+    5: 6,
+    6: 5,
+    7: 5,
+    8: 5,
+    9: 5,
+    10: 5,
+    11: 5,
+    12: 5,
+    13: 6,
+    14: 5,
+    15: 5,
+    16: 6,
+    17: 5,
+    18: 4,
+    19: 4,
+    20: 4,
+    21: 5,
+}
+
+
+def remove_source_markers(text: str) -> str:
+    """
+    Remove draft-style source markers:
+    - sentence citations such as .1, .2, .18
+    - table-cell suffixes such as High 1
+    - standalone source registry lines
+    """
+    cleaned_lines = []
+
+    for raw_line in text.splitlines():
+        line = raw_line.rstrip()
+
+        if re.match(r"^\s*\d{1,2}:\s+", line):
+            continue
+
+        line = re.sub(r"(?<=[A-Za-z\)\]])\.(\d{1,2})(?=\s|$)", ".", line)
+        line = re.sub(r"(?<=%)\s+\d{1,2}$", "", line)
+
+        protected_short_labels = (
+            re.match(r"^\s*Phase\s+\d[a-zA-Z]?\s*$", line, flags=re.I)
+            or re.match(r"^\s*Wave\s+\d\s*$", line, flags=re.I)
+            or re.match(r"^\s*Year\s+\d\s*$", line, flags=re.I)
+            or re.match(r"^\s*TABLE\s+\d+", line, flags=re.I)
+            or re.match(r"^\s*\d{1,2}\.\d{1,2}", line)
+        )
+
+        if not protected_short_labels:
+            line = re.sub(r"(?<=[A-Za-z\)])\s+\d{1,2}$", "", line)
+
+        cleaned_lines.append(line)
+
+    return "\n".join(cleaned_lines)
+
+
 def mask_sensitive_numbers(text: str) -> str:
-    year_tokens = {}
-    def protect_year(match):
-        token = f"__YEAR_{len(year_tokens)}__"
-        year_tokens[token] = match.group(0)
-        return token
+    """
+    Mask market-sensitive values while preserving:
+    - years
+    - section headings
+    - table numbers
+    - Phase labels
+    - Wave labels
+    - 10mg dose labels
+    """
+    protected_tokens = {}
 
-    protected = re.sub(r"\b20\d{2}\b", protect_year, text)
+    def protect(pattern: str):
+        nonlocal text
 
-    protected = re.sub(r"US\$?\s?\d[\d,\.]*\s?(Mn|million|billion|B|M)?", "US$ [Proprietary]", protected, flags=re.I)
-    protected = re.sub(r"\$\s?\d[\d,\.]*\s?(Mn|million|billion|B|M)?", "$ [Proprietary]", protected, flags=re.I)
-    protected = re.sub(r"\b\d[\d,\.]*\s?%", "[Proprietary]%", protected)
-    protected = re.sub(r"\b\d[\d,\.]*\s?(million|billion|Mn|patients|pts|patient|yr|year|CAGR)\b", "[Proprietary] \\1", protected, flags=re.I)
-    protected = re.sub(r"\b\d{1,3}(?:,\d{3})+(?:\.\d+)?\b", "[Proprietary]", protected)
-    protected = re.sub(r"(?<!Phase\s)(?<!Wave\s)(?<!TABLE\s)(?<!Table\s)\b\d+\.\d+\b", "[Proprietary]", protected)
+        def repl(match):
+            token = f"__PROTECTED_{len(protected_tokens)}__"
+            protected_tokens[token] = match.group(0)
+            return token
 
-    for token, year in year_tokens.items():
-        protected = protected.replace(token, year)
+        text = re.sub(pattern, repl, text, flags=re.I | re.M)
 
-    return protected
+    protect(r"\b20\d{2}\s*[–-]\s*20\d{2}\b")
+    protect(r"(?m)^\s*\d{1,2}\.\d{1,2}\.?\s+")
+    protect(r"\bTABLE\s+\d{1,2}\b")
+    protect(r"\b20\d{2}\b")
+    protect(r"\bPhase\s+\d[a-zA-Z]?\b")
+    protect(r"\bWave\s+\d\b")
+    protect(r"\bYear\s+\d\b")
+    protect(r"\b\d+\s?mg\b")
+    protect(r"\b\d+(st|nd|rd|th)-line\b")
+
+    text = re.sub(
+        r"\bUS\s?\d[\d,\.]*\s?(Mn|million|billion|B|M)?",
+        "US$ [Proprietary]",
+        text,
+        flags=re.I,
+    )
+
+    text = re.sub(
+        r"US\$?\s?\d[\d,\.]*\s?(Mn|million|billion|B|M)?",
+        "US$ [Proprietary]",
+        text,
+        flags=re.I,
+    )
+
+    text = re.sub(
+        r"\$\s?\d[\d,\.]*\s?(Mn|million|billion|B|M)?",
+        "$ [Proprietary]",
+        text,
+        flags=re.I,
+    )
+
+    text = re.sub(r"\b\d[\d,\.]*\s?%", "[Proprietary]%", text)
+
+    text = re.sub(
+        r"\b\d[\d,\.]*\s?(million|billion|Mn|patients|patient|pts|CAGR)\b",
+        r"[Proprietary] \1",
+        text,
+        flags=re.I,
+    )
+
+    text = re.sub(r"\b\d{1,3}(?:,\d{3})+(?:\.\d+)?\b", "[Proprietary]", text)
+    text = re.sub(r"\b\d+\.\d+\b", "[Proprietary]", text)
+    text = re.sub(r"\b(?!(?:19|20)\d{2}\b)\d{4,}\b", "[Proprietary]", text)
+
+    for token, value in protected_tokens.items():
+        text = text.replace(token, value)
+
+    return text
+
+
+def clean_and_mask(text: str) -> str:
+    cleaned = remove_source_markers(text)
+    masked = mask_sensitive_numbers(cleaned)
+    return masked
 
 
 def parse_report_sections(text: str) -> dict:
@@ -967,11 +1082,133 @@ def parse_report_sections(text: str) -> dict:
     return sections
 
 
-def format_report_text(text: str) -> str:
-    masked = mask_sensitive_numbers(text)
-    escaped = html.escape(masked)
-    escaped = escaped.replace("\n", "<br>")
-    return escaped
+def render_table_html(table_title: str, table_lines: list[str]) -> str:
+    table_match = re.search(r"TABLE\s+(\d+)", table_title, flags=re.I)
+    if not table_match:
+        return f"<div class='report-table-title'>{html.escape(clean_and_mask(table_title))}</div>"
+
+    table_num = int(table_match.group(1))
+    col_count = TABLE_COLUMN_COUNTS.get(table_num)
+
+    cleaned_lines = [line for line in table_lines if line.strip()]
+
+    if not col_count or len(cleaned_lines) < col_count:
+        body = "<br>".join(html.escape(clean_and_mask(x)) for x in cleaned_lines)
+        return f"""
+        <div class="report-table-wrap">
+            <div class="report-table-title">{html.escape(clean_and_mask(table_title))}</div>
+            <div class="report-line" style="padding:14px 16px;">{body}</div>
+        </div>
+        """
+
+    headers = cleaned_lines[:col_count]
+    body_lines = cleaned_lines[col_count:]
+
+    if len(body_lines) % col_count != 0:
+        missing = col_count - (len(body_lines) % col_count)
+        body_lines = body_lines + [""] * missing
+
+    rows = [
+        body_lines[i: i + col_count]
+        for i in range(0, len(body_lines), col_count)
+    ]
+
+    header_html = "".join(
+        f"<th>{html.escape(clean_and_mask(cell))}</th>" for cell in headers
+    )
+
+    rows_html = ""
+    for row in rows:
+        rows_html += "<tr>"
+        for cell in row:
+            rows_html += f"<td>{html.escape(clean_and_mask(cell))}</td>"
+        rows_html += "</tr>"
+
+    return f"""
+    <div class="report-table-wrap">
+        <div class="report-table-title">{html.escape(clean_and_mask(table_title))}</div>
+        <table class="report-table">
+            <thead><tr>{header_html}</tr></thead>
+            <tbody>{rows_html}</tbody>
+        </table>
+    </div>
+    """
+
+
+def format_paragraph_line(line: str) -> str:
+    clean_line = clean_and_mask(line.strip())
+
+    if not clean_line:
+        return ""
+
+    if clean_line.startswith("## "):
+        clean_line = clean_line.replace("## ", "").strip()
+        return f"<div class='report-chapter-heading'>{html.escape(clean_line)}</div>"
+
+    if re.match(r"^\d{1,2}\.\d{1,2}\.?\s+", clean_line):
+        return f"<div class='report-subheading'>{html.escape(clean_line)}</div>"
+
+    if ":" in clean_line and len(clean_line.split(":")[0]) <= 55:
+        left, right = clean_line.split(":", 1)
+        return (
+            f"<p class='report-paragraph'><strong>{html.escape(left)}:</strong>"
+            f"{html.escape(right)}</p>"
+        )
+
+    return f"<p class='report-paragraph'>{html.escape(clean_line)}</p>"
+
+
+def render_report_html(raw_text: str) -> str:
+    lines = raw_text.strip().splitlines()
+    output = []
+    i = 0
+
+    while i < len(lines):
+        line = lines[i].strip()
+
+        if re.match(r"^18\.2\.\s+Source Registry", line, flags=re.I):
+            i += 1
+            while i < len(lines) and not re.match(r"^18\.3\.", lines[i].strip()):
+                i += 1
+            continue
+
+        if re.match(r"^TABLE\s+\d+:", line, flags=re.I):
+            table_title = line
+            i += 1
+
+            while i < len(lines) and not lines[i].strip():
+                i += 1
+
+            table_lines = []
+
+            while i < len(lines):
+                next_line = lines[i].strip()
+
+                if not next_line:
+                    break
+
+                if next_line.startswith("## "):
+                    break
+
+                if re.match(r"^\d{1,2}\.\d{1,2}\.?\s+", next_line):
+                    break
+
+                if re.match(r"^TABLE\s+\d+:", next_line, flags=re.I):
+                    break
+
+                table_lines.append(next_line)
+                i += 1
+
+            output.append(render_table_html(table_title, table_lines))
+            continue
+
+        formatted = format_paragraph_line(line)
+        if formatted:
+            output.append(formatted)
+
+        i += 1
+
+    return "\n".join(output)
 
 
 REPORT_SECTIONS = parse_report_sections(REPORT_TEXT)
@@ -994,7 +1231,7 @@ def inject_css():
         }}
 
         [data-testid="stHeader"] {{
-            background: rgba(244,245,247,0.7);
+            background: rgba(244,245,247,0.72);
         }}
 
         footer {{
@@ -1137,39 +1374,6 @@ def inject_css():
             margin: 14px 0;
         }}
 
-        .insight-box {{
-            background: linear-gradient(135deg, #FFF9EA 0%, #FFFFFF 100%);
-            border: 1px solid rgba(201,162,39,0.35);
-            border-left: 6px solid {GOLD};
-            border-radius: 18px;
-            padding: 18px 20px;
-            color: {DARK_TEXT};
-            margin: 18px 0;
-            box-shadow: 0 8px 28px rgba(201,162,39,0.08);
-        }}
-
-        .closing-panel {{
-            background: linear-gradient(135deg, {BURGUNDY_DARK} 0%, {BURGUNDY} 100%);
-            color: white;
-            border-radius: 24px;
-            padding: 34px 36px;
-            box-shadow: 0 20px 55px rgba(58,7,28,0.24);
-            margin-top: 18px;
-        }}
-
-        .closing-panel h2 {{
-            color: white;
-            margin-top: 0;
-            font-size: 30px;
-            line-height: 1.2;
-        }}
-
-        .closing-panel p, .closing-panel li {{
-            color: rgba(255,255,255,0.88);
-            line-height: 1.7;
-            font-size: 15px;
-        }}
-
         .chart-card {{
             background: {WHITE};
             border: 1px solid {BORDER_GREY};
@@ -1194,16 +1398,17 @@ def inject_css():
         }}
 
         .funnel-row {{
-            height: 46px;
+            min-height: 46px;
             border-radius: 12px;
             margin: 10px auto;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 0 18px;
+            padding: 10px 18px;
             color: white;
             font-weight: 750;
             box-shadow: 0 8px 20px rgba(58,7,28,0.10);
+            gap: 16px;
         }}
 
         .matrix {{
@@ -1245,7 +1450,6 @@ def inject_css():
             min-height: 38px;
             padding: 7px 10px;
             border-radius: 999px;
-            background: {BURGUNDY};
             color: white;
             text-align: center;
             font-size: 11px;
@@ -1306,10 +1510,107 @@ def inject_css():
             background: white;
         }}
 
+        .report-chapter-heading {{
+            color: {BURGUNDY_DARK};
+            font-size: 22px;
+            font-weight: 900;
+            margin: 26px 0 14px 0;
+            padding: 10px 0 8px 0;
+            border-bottom: 1px solid {BORDER_GREY};
+        }}
+
+        .report-subheading {{
+            color: {BURGUNDY};
+            font-size: 17px;
+            font-weight: 850;
+            margin: 22px 0 10px 0;
+            padding-top: 4px;
+        }}
+
+        .report-paragraph {{
+            color: {DARK_TEXT};
+            font-size: 14.5px;
+            line-height: 1.72;
+            margin: 0 0 12px 0;
+        }}
+
+        .report-table-wrap {{
+            background: {WHITE};
+            border: 1px solid {BORDER_GREY};
+            border-radius: 16px;
+            margin: 18px 0 24px 0;
+            overflow-x: auto;
+            box-shadow: 0 8px 24px rgba(43,43,43,0.045);
+        }}
+
+        .report-table-title {{
+            background: linear-gradient(135deg, {BURGUNDY} 0%, {MID_BURGUNDY} 100%);
+            color: {WHITE};
+            font-size: 14px;
+            font-weight: 850;
+            padding: 13px 16px;
+            letter-spacing: 0.01em;
+        }}
+
+        .report-table {{
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 760px;
+            font-size: 13px;
+        }}
+
+        .report-table th {{
+            background: {BURGUNDY_DARK};
+            color: {WHITE};
+            text-align: left;
+            padding: 12px 14px;
+            font-weight: 800;
+            border-right: 1px solid rgba(255,255,255,0.12);
+            vertical-align: top;
+        }}
+
+        .report-table td {{
+            padding: 12px 14px;
+            border-bottom: 1px solid {BORDER_GREY};
+            color: {DARK_TEXT};
+            vertical-align: top;
+            line-height: 1.45;
+        }}
+
+        .report-table tbody tr:nth-child(even) td {{
+            background: #F8F8FA;
+        }}
+
+        .report-table tbody tr:hover td {{
+            background: #FFF9EA;
+        }}
+
         .report-line {{
             line-height: 1.7;
             font-size: 14.5px;
             color: {DARK_TEXT};
+        }}
+
+        .closing-panel {{
+            background: linear-gradient(135deg, {BURGUNDY_DARK} 0%, {BURGUNDY} 100%);
+            color: white;
+            border-radius: 24px;
+            padding: 34px 36px;
+            box-shadow: 0 20px 55px rgba(58,7,28,0.24);
+            margin-top: 18px;
+        }}
+
+        .closing-panel h2 {{
+            color: white;
+            margin-top: 0;
+            font-size: 30px;
+            line-height: 1.2;
+        }}
+
+        .closing-panel p, .closing-panel li {{
+            color: rgba(255,255,255,0.88);
+            line-height: 1.7;
+            font-size: 15px;
         }}
 
         .footer-smr {{
@@ -1334,7 +1635,7 @@ def inject_css():
             border-radius: 10px !important;
             border: 0 !important;
             font-weight: 800 !important;
-            height: 42px !important;
+            min-height: 42px !important;
         }}
 
         .stButton > button:hover {{
@@ -1347,15 +1648,24 @@ def inject_css():
             .kpi-grid {{
                 grid-template-columns: repeat(1, minmax(0, 1fr));
             }}
+
             .hero {{
                 padding: 30px;
             }}
+
             .hero h1 {{
                 font-size: 30px;
             }}
+
             .heatmap {{
                 grid-template-columns: 130px repeat(6, 145px);
                 overflow-x: auto;
+            }}
+
+            .funnel-row {{
+                width: 100% !important;
+                flex-direction: column;
+                align-items: flex-start;
             }}
         }}
         </style>
@@ -1429,9 +1739,17 @@ def section_card(title, subtitle="", body_html=""):
 def report_excerpt(section_key, max_lines=None):
     text = REPORT_SECTIONS.get(section_key, "")
     lines = text.splitlines()
+
     if max_lines:
         lines = lines[:max_lines]
-    return f"<div class='text-panel report-line'>{format_report_text(chr(10).join(lines))}</div>"
+
+    rendered = render_report_html("\n".join(lines))
+
+    return f"""
+    <div class='text-panel report-line'>
+        {rendered}
+    </div>
+    """
 
 
 # =============================================================================
@@ -1443,7 +1761,7 @@ def chart_tam_sam_som_funnel():
         <div class="chart-card">
             <div class="chart-title">TAM / SAM / SOM Funnel</div>
             <div class="chart-caption">
-                The full report quantifies each market layer, but this preview masks all proprietary values while preserving the strategic narrowing logic.
+                The full report quantifies each market layer, but this preview masks proprietary values while preserving the strategic narrowing logic.
             </div>
             <div class="funnel-row" style="width:100%;background:{BURGUNDY};">
                 <span>Lipid-Lowering Therapy Revenue Pool</span><span>US$ [Proprietary]</span>
@@ -1477,8 +1795,9 @@ def chart_competitive_matrix():
 
     bubble_html = ""
     for label, left, top, color in bubbles:
+        text_color = DARK_TEXT if color in [GOLD, SOFT_ROSE] else WHITE
         bubble_html += f"""
-        <div class="bubble" style="left:{left}%;top:{top}%;background:{color};">{html.escape(label)}</div>
+        <div class="bubble" style="left:{left}%;top:{top}%;background:{color};color:{text_color};">{html.escape(label)}</div>
         """
 
     st.markdown(
@@ -1511,18 +1830,27 @@ def chart_heatmap():
         "China": ["Medium", "High", "Medium", "Medium", "Medium", "Medium"],
         "Rest of World": ["Low", "Low", "Low", "Low", "Low", "Low"],
     }
-    cols = ["Reimbursement", "LDL-C Gap", "Specialist Adoption", "Pricing Potential", "Menarini Fit", "Competitive Pressure"]
+
+    cols = [
+        "Reimbursement",
+        "LDL-C Gap",
+        "Specialist Adoption",
+        "Pricing Potential",
+        "Menarini Fit",
+        "Competitive Pressure",
+    ]
 
     html_grid = "<div class='heatmap'>"
     html_grid += "<div class='heat-cell heat-head'>Region</div>"
+
     for c in cols:
         html_grid += f"<div class='heat-cell heat-head'>{html.escape(c)}</div>"
 
     for region, vals in rows.items():
         html_grid += f"<div class='heat-cell heat-row'>{html.escape(region)}</div>"
         for v in vals:
-            cls = v.lower()
-            html_grid += f"<div class='heat-cell {cls}'>{v}</div>"
+            html_grid += f"<div class='heat-cell {v.lower()}'>{v}</div>"
+
     html_grid += "</div>"
 
     st.markdown(
@@ -1555,6 +1883,7 @@ def chart_sankey():
                         <stop offset="100%" stop-color="{BURGUNDY}" stop-opacity="0.62"/>
                     </linearGradient>
                 </defs>
+
                 <rect x="28" y="52" width="190" height="62" rx="16" fill="{BURGUNDY}"/>
                 <text x="123" y="78" text-anchor="middle" fill="white" font-size="13" font-weight="800">High-risk</text>
                 <text x="123" y="96" text-anchor="middle" fill="white" font-size="13" font-weight="800">dyslipidemia</text>
@@ -1582,6 +1911,7 @@ def chart_sankey():
 
                 <path d="M640 278 C640 340, 755 340, 755 352" stroke="{SOFT_ROSE}" stroke-width="22" fill="none" opacity="0.6"/>
                 <path d="M870 278 C870 340, 755 340, 755 352" stroke="{GOLD}" stroke-width="22" fill="none" opacity="0.75"/>
+
                 <rect x="640" y="352" width="230" height="62" rx="16" fill="{BURGUNDY}"/>
                 <text x="755" y="378" text-anchor="middle" fill="white" font-size="13" font-weight="800">Menarini commercial</text>
                 <text x="755" y="396" text-anchor="middle" fill="white" font-size="13" font-weight="800">opportunity</text>
@@ -1654,6 +1984,7 @@ def chart_transition_map():
                         <stop offset="100%" stop-color="{BURGUNDY}" stop-opacity="0.62"/>
                     </linearGradient>
                 </defs>
+
                 <rect x="40" y="120" width="165" height="70" rx="18" fill="{BURGUNDY_DARK}"/>
                 <text x="122" y="148" text-anchor="middle" fill="white" font-size="13" font-weight="800">Generic baseline</text>
                 <text x="122" y="168" text-anchor="middle" fill="white" font-size="13" font-weight="800">therapy</text>
@@ -1676,6 +2007,7 @@ def chart_transition_map():
 
                 <path d="M755 95 C815 95, 815 155, 875 155" stroke="{SOFT_ROSE}" stroke-width="22" fill="none" opacity="0.65"/>
                 <path d="M755 215 C815 215, 815 155, 875 155" stroke="{GOLD}" stroke-width="22" fill="none" opacity="0.65"/>
+
                 <rect x="805" y="120" width="165" height="70" rx="18" fill="{BURGUNDY}"/>
                 <text x="887" y="148" text-anchor="middle" fill="white" font-size="13" font-weight="800">Next-gen oral</text>
                 <text x="887" y="168" text-anchor="middle" fill="white" font-size="13" font-weight="800">CETP / FDC</text>
@@ -1752,7 +2084,7 @@ def chart_value_architecture():
 
 
 # =============================================================================
-# TABLES
+# DASHBOARD TABLES
 # =============================================================================
 def render_market_layer_table():
     st.markdown(
@@ -1760,23 +2092,49 @@ def render_market_layer_table():
         <div class="chart-card">
             <div class="chart-title">Market Layer Architecture & Definitions</div>
             <div class="chart-caption">Numerical values are masked; the structural logic remains visible in the preview.</div>
-            <table style="width:100%;border-collapse:collapse;font-size:13px;">
-                <thead>
-                    <tr style="background:{BURGUNDY};color:white;">
-                        <th style="padding:12px;text-align:left;">Market Layer</th>
-                        <th style="padding:12px;text-align:left;">Definition</th>
-                        <th style="padding:12px;text-align:left;">Starts From</th>
-                        <th style="padding:12px;text-align:left;">Use in Forecast</th>
-                        <th style="padding:12px;text-align:left;">Relevance to Menarini</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};font-weight:800;color:{BURGUNDY};">Strict CETP Market</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Revenue from approved CETP inhibitors only</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">2027 launch</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Core growth metric</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Client product sales</td></tr>
-                    <tr><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};font-weight:800;color:{BURGUNDY};">Practical TAM</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Current revenue of relevant lipid-lowering therapies</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">2025</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Ceiling / budget-pool logic</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Competitive revenue pool</td></tr>
-                    <tr><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};font-weight:800;color:{BURGUNDY};">SAM</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">CETP-addressable subset after label and access filters</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">2027</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Eligible pool</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Territory volume potential</td></tr>
-                    <tr><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};font-weight:800;color:{BURGUNDY};">SOM</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Obicetrapib revenue in Menarini territory</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">2027</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Financial forecast</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Direct client revenue and profit</td></tr>
-                </tbody>
-            </table>
+            <div class="report-table-wrap">
+                <table class="report-table">
+                    <thead>
+                        <tr>
+                            <th>Market Layer</th>
+                            <th>Definition</th>
+                            <th>Starts From</th>
+                            <th>Use in Forecast</th>
+                            <th>Relevance to Menarini</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Strict CETP Market</strong></td>
+                            <td>Revenue from approved CETP inhibitors only</td>
+                            <td>2027 launch</td>
+                            <td>Core growth metric</td>
+                            <td>Client product sales</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Practical TAM</strong></td>
+                            <td>Current revenue of relevant lipid-lowering therapies</td>
+                            <td>2025</td>
+                            <td>Ceiling / budget-pool logic</td>
+                            <td>Competitive revenue pool</td>
+                        </tr>
+                        <tr>
+                            <td><strong>SAM</strong></td>
+                            <td>CETP-addressable subset after label and access filters</td>
+                            <td>2027</td>
+                            <td>Eligible pool</td>
+                            <td>Territory volume potential</td>
+                        </tr>
+                        <tr>
+                            <td><strong>SOM</strong></td>
+                            <td>Obicetrapib revenue in Menarini territory</td>
+                            <td>2027</td>
+                            <td>Financial forecast</td>
+                            <td>Direct client revenue and profit</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1789,23 +2147,49 @@ def render_risk_table():
         <div class="chart-card">
             <div class="chart-title">Risk / Barrier Matrix</div>
             <div class="chart-caption">Market impact values are masked and shown directionally.</div>
-            <table style="width:100%;border-collapse:collapse;font-size:13px;">
-                <thead>
-                    <tr style="background:{BURGUNDY};color:white;">
-                        <th style="padding:12px;text-align:left;">Risk</th>
-                        <th style="padding:12px;text-align:left;">Severity</th>
-                        <th style="padding:12px;text-align:left;">Probability</th>
-                        <th style="padding:12px;text-align:left;">Market Impact</th>
-                        <th style="padding:12px;text-align:left;">Mitigation Priority</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};font-weight:800;color:{BURGUNDY};">Narrow Label</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">High</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Medium</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">[Proprietary] reduction in SAM</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">HTA dossier preparation</td></tr>
-                    <tr><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};font-weight:800;color:{BURGUNDY};">Class Skepticism</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">High</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Medium</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Slower adoption ramp</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Medical education</td></tr>
-                    <tr><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};font-weight:800;color:{BURGUNDY};">Injectable Substitution</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Medium</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">High</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Caps high-risk share</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Oral biologic positioning</td></tr>
-                    <tr><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};font-weight:800;color:{BURGUNDY};">FDC Delay</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Medium</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Low</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">Blended price pressure</td><td style="padding:12px;border-bottom:1px solid {BORDER_GREY};">MAA strategy</td></tr>
-                </tbody>
-            </table>
+            <div class="report-table-wrap">
+                <table class="report-table">
+                    <thead>
+                        <tr>
+                            <th>Risk</th>
+                            <th>Severity</th>
+                            <th>Probability</th>
+                            <th>Market Impact</th>
+                            <th>Mitigation Priority</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Narrow Label</strong></td>
+                            <td>High</td>
+                            <td>Medium</td>
+                            <td>[Proprietary] reduction in SAM</td>
+                            <td>HTA dossier preparation</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Class Skepticism</strong></td>
+                            <td>High</td>
+                            <td>Medium</td>
+                            <td>Slower adoption ramp</td>
+                            <td>Medical education</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Injectable Substitution</strong></td>
+                            <td>Medium</td>
+                            <td>High</td>
+                            <td>Caps high-risk share</td>
+                            <td>Oral biologic positioning</td>
+                        </tr>
+                        <tr>
+                            <td><strong>FDC Delay</strong></td>
+                            <td>Medium</td>
+                            <td>Low</td>
+                            <td>Blended price pressure</td>
+                            <td>MAA strategy</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1851,6 +2235,7 @@ def render_cover():
         "CETP inhibitors are being repositioned from a historically challenged mechanism into a potential next-generation oral lipid-lowering category.",
         report_excerpt("1. Executive Overview & Strategic Snapshot ($Mn, %, 2025–2035)", 18),
     )
+
     chart_tam_sam_som_funnel()
     chart_competitive_matrix()
 
@@ -1888,7 +2273,7 @@ def render_tam_preview():
     section_card(
         "TAM / SAM / SOM Preview",
         "The full report provides year-by-year quantitative tables, but this sample preview masks all values to preserve proprietary model outputs.",
-        report_excerpt("10. Market Size & Forecast, 2025–2035 ($Mn, Patients, %)", 50),
+        report_excerpt("10. Market Size & Forecast, 2025–2035 ($Mn, Patients, %)", 70),
     )
     chart_tam_sam_som_funnel()
     chart_sankey()
@@ -1908,7 +2293,8 @@ def render_regulatory():
     section_card(
         "Clinical & Regulatory Readiness",
         "Approval timing, label breadth and outcomes evidence are critical variables in the forecast.",
-        report_excerpt("7. Obicetrapib Clinical Evidence & Pipeline Positioning") + report_excerpt("8. Regulatory Pathway, Label Scenarios & Launch Timing"),
+        report_excerpt("7. Obicetrapib Clinical Evidence & Pipeline Positioning")
+        + report_excerpt("8. Regulatory Pathway, Label Scenarios & Launch Timing"),
     )
 
 
@@ -1916,7 +2302,8 @@ def render_pricing_access():
     section_card(
         "Pricing, Access & Adoption",
         "Pricing strategy must navigate between low-cost generic add-ons and high-cost injectables while building a payer case for an oral biologic-like step.",
-        report_excerpt("9. Pricing, Reimbursement & Monetization Architecture ($/Patient/Year)") + report_excerpt("13. Adoption Dynamics, Access Readiness & Market Conversion"),
+        report_excerpt("9. Pricing, Reimbursement & Monetization Architecture ($/Patient/Year)")
+        + report_excerpt("13. Adoption Dynamics, Access Readiness & Market Conversion"),
     )
 
 
@@ -1933,7 +2320,8 @@ def render_risk():
     section_card(
         "Risk, Barriers & Watchpoints",
         "The most important downside risks relate to restrictive labeling, payer filters, CETP class skepticism and FDC timing.",
-        report_excerpt("15. Scenario Analysis & Forecast Sensitivities") + report_excerpt("16. Risk Assessment & Mitigation Framework"),
+        report_excerpt("15. Scenario Analysis & Forecast Sensitivities")
+        + report_excerpt("16. Risk Assessment & Mitigation Framework"),
     )
     render_risk_table()
     chart_radar()
@@ -1978,31 +2366,36 @@ def render_full_report():
         <div class="section-card">
             <div class="section-title">Full Report Summary Explorer</div>
             <div class="section-subtitle">
-                Every section from the embedded report summary is shown below with all market-sensitive numbers masked.
-                Use the search box to filter by chapter, keyword, therapy class, geography or commercial theme.
+                Every section from the embedded report summary is shown below with market-sensitive values masked.
+                Tables are rendered as structured client-facing exhibits. Source-marker artifacts have been removed for presentation quality.
             </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    query = st.text_input("Search report summary", placeholder="Example: obicetrapib, HTA, Germany, SAM, FDC, PCSK9")
+    query = st.text_input(
+        "Search report summary",
+        placeholder="Example: obicetrapib, HTA, Germany, SAM, FDC, PCSK9",
+    )
 
     show_all = st.toggle("Show complete summary in one continuous view", value=False)
 
     if show_all:
         st.markdown(
-            f"<div class='text-panel report-line'>{format_report_text(REPORT_TEXT)}</div>",
+            f"<div class='text-panel report-line'>{render_report_html(REPORT_TEXT)}</div>",
             unsafe_allow_html=True,
         )
     else:
         for title, content in REPORT_SECTIONS.items():
             combined = f"{title}\n{content}"
+
             if query.strip() and query.lower() not in combined.lower():
                 continue
+
             with st.expander(title, expanded=False):
                 st.markdown(
-                    f"<div class='report-line'>{format_report_text(content)}</div>",
+                    f"<div class='report-line'>{render_report_html(content)}</div>",
                     unsafe_allow_html=True,
                 )
 
@@ -2053,6 +2446,7 @@ def main():
         )
 
         st.markdown("<hr style='border-color:rgba(255,255,255,0.18);'>", unsafe_allow_html=True)
+
         if st.button("End Secure Session", use_container_width=True):
             st.session_state["logged_in"] = False
             st.rerun()
